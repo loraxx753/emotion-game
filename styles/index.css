@@ -1,0 +1,119 @@
+@import url('./card.css');
+
+@property --gradient-width   { syntax: '<length-percentage>'; inherits: false; initial-value: 120%; }
+@property --gradient-height  { syntax: '<length-percentage>'; inherits: false; initial-value: 120%; }
+@property --center-h         { syntax: '<length-percentage>'; inherits: false; initial-value: 50%; }
+@property --center-v         { syntax: '<length-percentage>'; inherits: false; initial-value: 0%; }
+@property --inner-color      { syntax: '<color>';             inherits: false; initial-value: transparent; }
+@property --inner-color-stop { syntax: '<percentage>';        inherits: false; initial-value: 0%; }
+@property --outer-color      { syntax: '<color>';             inherits: false; initial-value: transparent; }
+@property --outer-color-stop { syntax: '<percentage>';        inherits: false; initial-value: 60%; }
+@property --card-width { syntax: '<length>';                  inherits: false; initial-value: 100px; }
+
+
+
+:root {
+  font-family: sans-serif;
+  margin: 0 auto;
+  color: white;
+  font-size: 5em;
+  --card-width: 240px;
+}
+
+* { position: relative; }
+
+body, emotion-wrapper, the-board {
+  display: block;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+body {
+  margin: 0 auto;
+  text-align: center;
+  justify-content: center;
+}
+
+the-board {
+  display: grid;
+  background: green;
+}
+
+/* You no longer need --emotional-color on the wrapper; color is per <the-emotion> */
+emotion-card {
+  container-type: inline-size;
+  display: block;
+  flex-direction: column;
+  /* Base background: hue from the core, with strong saturation/medium lightness */
+  text-transform: uppercase;
+  padding: 10px;
+  background-image: radial-gradient(
+    var(--gradient-width, 120%) var(--gradient-height, 120%) 
+    at var(--center-h, 50%) var(--center-v),
+    var(--inner-color) var(--inner-color-stop, 0%),
+    var(--outer-color, transparent) var(--outer-color-stop, 60%)
+  );
+  overflow: hidden;
+  position: relative;
+  aspect-ratio: 5 / 7;
+  width: var(--card-width, 240px);
+  border-radius: 10px;
+  border: 1px solid #333;
+}
+
+emotion-card > * {
+  display: block;
+  position: relative;
+}
+
+
+emotion-card emotion-name {
+  font-size: 10cqw;
+}
+
+emotion-card emotion-parent {
+  font-size: 8cqw;
+}
+
+emotion-card emotional-core {
+  font-size: 6cqw;
+}
+
+emotion-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  /* 3px inner accent line */
+  box-shadow: inset 0 0 0 3px
+    color-mix(in oklab,
+      var(--accent-color, var(--accent-not)) 70%,
+      white 30%);
+  pointer-events: none;
+}
+
+
+@media (hover: hover) {
+  emotion-card {
+    transition: transform 120ms ease, box-shadow 120ms ease;
+    transform: translateY(0) rotate(0);
+  }
+  emotion-card:hover {
+    transform: translateY(-2px) rotate(-15deg);
+    box-shadow:
+      0 0.5px 1px hsl(0 0% 0% / 0.12),
+      0 4px 10px hsl(0 0% 0% / 0.16),
+      0 16px 28px hsl(0 0% 0% / 0.22);
+  }
+  emotion-card:active { transform: translateY(0); }
+}
+
+emotion-card::after {
+  content: "";
+  position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(120% 180% at 50% -40%, hsl(0 0% 100% / .08), transparent 45%),
+    repeating-linear-gradient(0deg, hsl(0 0% 0% / .02) 0 2px, transparent 2px 4px);
+  mix-blend-mode: multiply;
+}
