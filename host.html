@@ -15,24 +15,24 @@
   code.card { display:inline-block; border:1px solid #999; border-radius:4px; padding:.1rem .35rem; margin-right:.25rem; }
   /* QR modal */
   dialog { border:none; border-radius:12px; box-shadow:0 20px 60px rgba(0,0,0,.25); }
-  #qrCanvas { display:block; margin: .5rem auto; }
+  #qrCanvas { display:none; margin: .5rem auto; }
   #video { width:320px; height:auto; background:#000; }
 </style>
 
 <body>
-<section>
+<section id="signalingSection">
   <h2>Signaling (Host)</h2>
   <div class="row">
     <button id="btnCreateOffer">Create Offer</button>
-    <button id="btnCopyOffer">Copy Offer</button>
-    <button id="btnShowOfferQR">Show Offer QR</button>
-    <button id="btnPasteAnswer">Paste Answer</button>
+    <button id="btnCopyOffer" class="debug-only" style="display: none;">Copy Offer</button>
+    <button id="btnShowOfferQR" class="debug-only" style="display: none;">Show Offer QR</button>
+    <button id="btnPasteAnswer" class="debug-only" style="display: none;">Paste Answer</button>
     <button id="btnScanAnswerQR">Scan Answer QR</button>
   </div>
-  <label>Local Offer (share to a player):</label>
-  <textarea id="localOffer" readonly></textarea>
-  <label>Remote Answer (paste from a player):</label>
-  <textarea id="remoteAnswer" placeholder="Paste player's answer here"></textarea>
+  <label class="debug-only" style="display: none;">Local Offer (share to a player):</label>
+  <textarea id="localOffer" class="debug-only" style="display: none;" readonly></textarea>
+  <label class="debug-only" style="display: none;">Remote Answer (paste from a player):</label>
+  <textarea id="remoteAnswer" class="debug-only" style="display: none;" placeholder="Paste player's answer here"></textarea>
   <p>Repeat the handshake for each additional player. One <b>host.html</b> serves the whole table.</p>
 </section>
 
@@ -194,10 +194,36 @@ btnCreateOffer.onclick = async () => {
   const dc = pc.createDataChannel('rpg', { ordered:true });
   const tempId = 'P'+Math.random().toString(36).slice(2,8);
   setupDC(tempId, dc, pc);
-  pc.onicecandidate = () => { taLocalOffer.value = JSON.stringify(pc.localDescription); };
-  const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
-  taLocalOffer.value = JSON.stringify(pc.localDescription);
+  
+  let qrShown = false;
+  
+  pc.onicecandidate = (event) => { 
+    if (event.candidate === null && !qrShown) {
+      // ICE gathering is complete, show QR code once
+      taLocalOffer.value = JSON.stringify(pc.localDescription);
+      if (taLocalOffer.value.trim()) {
+        const compressed = LZString.compressToEncodedURIComponent(taLocalOffer.value);
+        showQR(`O:${compressed}`);
+        qrShown = true;
+      }
+    }
+  };
+  
+  const offer = await pc.createOffer(); 
+  await pc.setLocalDescription(offer);
   peers.set(tempId, { pc, dc, temp:true });
+  
+  // Fallback: if ICE gathering doesn't complete, show QR after a delay
+  setTimeout(() => {
+    if (!qrShown) {
+      taLocalOffer.value = JSON.stringify(pc.localDescription);
+      if (taLocalOffer.value.trim()) {
+        const compressed = LZString.compressToEncodedURIComponent(taLocalOffer.value);
+        showQR(`O:${compressed}`);
+        qrShown = true;
+      }
+    }
+  }, 1000);
 };
 
 btnCopyOffer.onclick = async () => { await navigator.clipboard.writeText(taLocalOffer.value); alert('Offer copied'); };
@@ -238,6 +264,7 @@ function setupDC(tempId, dc, pc){
     const msg = JSON.parse(ev.data);
     if (msg.type === 'HELLO'){
       const playerId = msg.player_id || msg.name || ('P'+Math.random().toString(36).slice(2,8));
+      console.log('Received HELLO from:', playerId, 'with chips:', msg.chips);
       const rec = peers.get(tempId); peers.delete(tempId); peers.set(playerId, { pc, dc });
       const seats = tableState.seats.some(s=>s.id===playerId)
         ? tableState.seats
@@ -245,6 +272,7 @@ function setupDC(tempId, dc, pc){
       tableDispatch({ type:'SET_SEATS', seats });
       sendTo(playerId, { type:'ACCEPT', ruleset_version: 'poker-min@0.1.0' });
       sendTo(playerId, { type:'TABLE', state: publicTableSnapshot() });
+      console.log('Refreshing turn select with seats:', seats.map(s => s.id));
       refreshTurnSelect();
     }
     else if (msg.type === 'INTENT'){
@@ -297,52 +325,179 @@ document.getElementById('btnDealRiver').onclick = () => {
   tableDispatch({ type:'SET_COMMUNITY', cards: prev.concat(cards) });
 };
 const selTurn = document.getElementById('selTurn');
-function refreshTurnSelect(){ selTurn.replaceChildren(); tableState.seats.forEach(s=>{ const o=document.createElement('option'); o.value=s.id; o.textContent=s.id; selTurn.appendChild(o); }); }
+function refreshTurnSelect(){ 
+  console.log('refreshTurnSelect called with tableState.seats:', tableState.seats);
+  selTurn.replaceChildren(); 
+  tableState.seats.forEach(s=>{ 
+    console.log('Adding option for seat:', s.id);
+    const o=document.createElement('option'); 
+    o.value=s.id; 
+    o.textContent=s.id; 
+    selTurn.appendChild(o); 
+  }); 
+}
 document.getElementById('btnSetTurn').onclick = () => { const pid = selTurn.value; tableDispatch({ type:'SET_TURN', playerId: pid }); broadcast({ type:'TURN', player: pid }); };
 document.getElementById('blinds').onchange = (e) => { tableEl.setAttribute('level', e.target.value); };
 
 /*** ---------- QR encode/decode plumbing ---------- ***/
 function showQR(text){
   qrTitle.textContent = 'Share Offer (QR)';
-  const dlg = qrDialog; const ctx = qrCanvas.getContext('2d'); ctx.clearRect(0,0,qrCanvas.width,qrCanvas.height);
-  // Render QR into a temp div then draw to canvas (qrcode.js API)
+  const ctx = qrCanvas.getContext('2d'); 
+  ctx.clearRect(0,0,qrCanvas.width,qrCanvas.height);
+  
+  // Add loading indicator
+  ctx.fillStyle = '#666';
+  ctx.font = '16px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText('Generating QR...', 160, 160);
+  
   const tmp = document.createElement('div');
-  new QRCode(tmp, { text, width: 320, height: 320, correctLevel: QRCode.CorrectLevel.L });
-  const img = tmp.querySelector('img') || tmp.querySelector('canvas');
-  if (img instanceof HTMLImageElement) {
-    img.onload = () => { ctx.drawImage(img, 0, 0, 320, 320); URL.revokeObjectURL(img.src); };
-  } else if (img instanceof HTMLCanvasElement) {
-    ctx.drawImage(img, 0, 0, 320, 320);
+  tmp.style.position = 'absolute';
+  tmp.style.top = '-9999px';
+  document.body.appendChild(tmp);
+  
+  try {
+    // Create QR code with error handling
+    const qr = new QRCode(tmp, { 
+      text, 
+      width: 320, 
+      height: 320, 
+      correctLevel: QRCode.CorrectLevel.L,
+      colorDark: '#000000',
+      colorLight: '#ffffff'
+    });
+    
+    // Multiple attempts to render the QR code
+    let attempts = 0;
+    const maxAttempts = 10;
+    
+    const tryRender = () => {
+      attempts++;
+      const img = tmp.querySelector('img');
+      const canvas = tmp.querySelector('canvas');
+      
+      if (img && img.complete && img.naturalWidth > 0) {
+        // Image is ready
+        ctx.clearRect(0,0,qrCanvas.width,qrCanvas.height);
+        ctx.drawImage(img, 0, 0, 320, 320);
+        document.body.removeChild(tmp);
+        console.log('Host QR rendered via img element');
+        return;
+      }
+      
+      if (canvas && canvas.width > 0) {
+        // Canvas is ready
+        ctx.clearRect(0,0,qrCanvas.width,qrCanvas.height);
+        ctx.drawImage(canvas, 0, 0, 320, 320);
+        document.body.removeChild(tmp);
+        console.log('Host QR rendered via canvas element');
+        return;
+      }
+      
+      if (attempts < maxAttempts) {
+        setTimeout(tryRender, 50);
+      } else {
+        // Fallback: show the text
+        ctx.clearRect(0,0,qrCanvas.width,qrCanvas.height);
+        ctx.fillStyle = '#000';
+        ctx.font = '12px monospace';
+        ctx.textAlign = 'left';
+        const lines = text.match(/.{1,40}/g) || [text];
+        lines.slice(0, 20).forEach((line, i) => {
+          ctx.fillText(line, 10, 20 + i * 14);
+        });
+        document.body.removeChild(tmp);
+        console.error('Host QR generation failed, showing text fallback');
+      }
+    };
+    
+    // Start trying to render
+    setTimeout(tryRender, 100);
+    
+  } catch (error) {
+    console.error('Host QR generation error:', error);
+    // Fallback: show error message
+    ctx.clearRect(0,0,qrCanvas.width,qrCanvas.height);
+    ctx.fillStyle = '#ff0000';
+    ctx.font = '16px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('QR generation failed', 160, 160);
+    document.body.removeChild(tmp);
   }
+  
+  qrCanvas.style.display = 'block';
   video.style.display = 'none';
-  dlg.showModal();
+  qrDialog.showModal();
 }
 async function startScan(onDecoded){
-  const dlg = qrDialog;
   qrTitle.textContent = 'Scanning…';
+  qrCanvas.style.display = 'none';
   video.style.display = 'block';
-  const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-  video.srcObject = stream; await video.play();
-  scanning = true;
-  const off = document.createElement('canvas'); const ctx = off.getContext('2d');
-  const loop = async () => {
-    if (!scanning) return;
-    const w = video.videoWidth, h = video.videoHeight;
-    off.width = w; off.height = h; ctx.drawImage(video, 0, 0, w, h);
-    const img = ctx.getImageData(0, 0, w, h);
-    const code = jsQR(img.data, w, h, { inversionAttempts: "dontInvert" });
-    if (code && code.data) {
-      const ok = await onDecoded(code.data);
-      if (ok) { stopScan(); dlg.close(); return; }
-    }
-    rafId = requestAnimationFrame(loop);
-  };
-  dlg.addEventListener('close', stopScan, { once:true });
-  loop();
+  
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    video.srcObject = stream; 
+    await video.play();
+    
+    let running = true;
+    qrDialog.addEventListener('close', () => { running=false; stopScan(); }, { once:true });
+    
+    const off = document.createElement('canvas'); 
+    const ctx = off.getContext('2d');
+    
+    const loop = async () => {
+      if (!running) return;
+      const w = video.videoWidth, h = video.videoHeight;
+      if (w === 0 || h === 0) {
+        rafId = requestAnimationFrame(loop);
+        return;
+      }
+      
+      off.width = w; off.height = h; 
+      ctx.drawImage(video, 0, 0, w, h);
+      const img = ctx.getImageData(0, 0, w, h);
+      const code = jsQR(img.data, w, h, { inversionAttempts: "dontInvert" });
+      
+      if (code && code.data) {
+        console.log('Host scanned QR:', code.data);
+        const ok = await onDecoded(code.data);
+        if (ok) { 
+          stopScan(); 
+          qrDialog.close(); 
+          return; 
+        }
+      }
+      rafId = requestAnimationFrame(loop);
+    };
+    
+    qrDialog.showModal();
+    loop();
+    
+  } catch (error) {
+    console.error('Camera access error:', error);
+    alert('Camera access denied or not available');
+  }
 }
 function stopScan(){
-  scanning = false; cancelAnimationFrame(rafId);
-  const s = video.srcObject; if (s) { s.getTracks().forEach(t=>t.stop()); video.srcObject = null; }
+  scanning = false; 
+  cancelAnimationFrame(rafId);
+  const s = video.srcObject; 
+  if (s) { 
+    s.getTracks().forEach(t=>t.stop()); 
+    video.srcObject = null; 
+  }
+}
+
+/*** ---------- Debug mode ---------- ***/
+// Show debug-only elements if ?debug parameter is present
+if (new URLSearchParams(window.location.search).has('debug')) {
+  document.querySelectorAll('.debug-only').forEach(element => {
+    if (element.tagName === 'BUTTON') {
+      element.style.display = 'inline-block';
+    } else {
+      element.style.display = 'block';
+    }
+  });
 }
 </script>
 </body>
