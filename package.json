@@ -1,0 +1,21 @@
+{
+  "name": "poker-party",
+  "version": "1.0.0",
+  "description": "",
+  "homepage": "https://github.com/loraxx753/emotion-game#readme",
+  "bugs": {
+    "url": "https://github.com/loraxx753/emotion-game/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/loraxx753/emotion-game.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "start": "http-server . --ssl --cert localhost+3.pem --key localhost+3-key.pem",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}

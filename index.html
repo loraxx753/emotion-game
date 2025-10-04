@@ -1,215 +1,36 @@
-<html>
-  <head>
-    <title>Universal Card Game Engine</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="./styles/index.css" rel="stylesheet" />
-  </head>
-  <body>
-    <!-- Mobile-first single card demo -->
-    <section id="single-card-demo">
-      <h2>Single Card Focus</h2>
-      
-      <the-board>
-        <a-deck deck-type="emotions">
-          <a-card></a-card>
-        </a-deck>
-      </the-board>
-      
-      <nav id="card-controls">
-        <button onclick="nextCard()">Next Card</button>
-        <button onclick="shuffleDeck()">Shuffle</button>
-      </nav>
-    </section>
-
-    <!-- Original demos (hidden by default) -->
-    <section id="emotion-demo" style="display: none;">
-      <h2>Emotion Cards</h2>
-      <nav id="game-controls">
-        <button onclick="showDemo('single-card-demo')">Single Card</button>
-        <button onclick="showDemo('emotion-demo')">Emotion Cards</button>
-        <button onclick="showDemo('playing-cards-demo')">Playing Cards</button>
-        <button onclick="showDemo('uno-demo')">UNO Cards</button>
-        <button onclick="showDemo('dice-demo')">Dice Rolls</button>
-        <button onclick="showDemo('dnd-stats-demo')">D&D Stats</button>
-        <button onclick="showDemo('dice-rollers-demo')">Dice Rollers</button>
-        <button onclick="shuffleCurrentDeck()">Shuffle & Redeal</button>
-      </nav>
-
-      <card-game deck-type="emotions" game-mode="display" hand-size="4">
-        <the-board>
-          <your-hand>
-            <game-card data-card-type="emotion-card"></game-card>
-            <game-card data-card-type="emotion-card"></game-card>
-            <game-card data-card-type="emotion-card"></game-card>
-            <game-card data-card-type="emotion-card"></game-card>
-          </your-hand>
-        </the-board>
-        <div class="deck-info"></div>
-      </card-game>
-    </section>
-
-    <!-- Playing cards demo -->
-    <section id="playing-cards-demo" style="display: none;">
-      <h2>Playing Cards</h2>
-      <card-game deck-type="standard" game-mode="display" hand-size="5">
-        <the-board>
-          <your-hand>
-            <game-card data-card-type="playing-card"></game-card>
-            <game-card data-card-type="playing-card"></game-card>
-            <game-card data-card-type="playing-card"></game-card>
-            <game-card data-card-type="playing-card"></game-card>
-            <game-card data-card-type="playing-card"></game-card>
-          </your-hand>
-        </the-board>
-      </card-game>
-    </section>
-
-    <!-- UNO cards demo -->
-    <section id="uno-demo" style="display: none;">
-      <h2>UNO Cards</h2>
-      <card-game deck-type="uno" game-mode="display" hand-size="7">
-        <the-board>
-          <your-hand>
-            <game-card data-card-type="uno-card"></game-card>
-            <game-card data-card-type="uno-card"></game-card>
-            <game-card data-card-type="uno-card"></game-card>
-            <game-card data-card-type="uno-card"></game-card>
-            <game-card data-card-type="uno-card"></game-card>
-            <game-card data-card-type="uno-card"></game-card>
-            <game-card data-card-type="uno-card"></game-card>
-          </your-hand>
-        </the-board>
-      </card-game>
-    </section>
-
-    <!-- Dice rolling demo -->
-    <section id="dice-demo" style="display: none;">
-      <h2>Dice Rolls</h2>
-      <card-game deck-type="dice" notation="2d6+3" game-mode="display" hand-size="5">
-        <the-board>
-          <your-hand>
-            <game-card data-card-type="dice-result"></game-card>
-            <game-card data-card-type="dice-result"></game-card>
-            <game-card data-card-type="dice-result"></game-card>
-            <game-card data-card-type="dice-result"></game-card>
-            <game-card data-card-type="dice-result"></game-card>
-          </your-hand>
-        </the-board>
-      </card-game>
-    </section>
-
-    <!-- D&D Character Stats demo -->
-    <section id="dnd-stats-demo" style="display: none;">
-      <h2>D&D Character Stats</h2>
-
-      <card-game deck-type="dnd-stats" method="4d6-drop-lowest" game-mode="display" hand-size="6">
-        <the-board>
-          <your-hand>
-            <game-card data-card-type="ability-score"></game-card>
-            <game-card data-card-type="ability-score"></game-card>
-            <game-card data-card-type="ability-score"></game-card>
-            <game-card data-card-type="ability-score"></game-card>
-            <game-card data-card-type="ability-score"></game-card>
-            <game-card data-card-type="ability-score"></game-card>
-          </your-hand>
-        </the-board>
-      </card-game>
-    </section>
-
-    <!-- Interactive Dice Rollers -->
-    <section id="dice-rollers-demo" style="display: none;">
-      <h2>Interactive Dice Rollers</h2>
-      <dice-set preset="dnd"></dice-set>
-    </section>
-
-    <!-- Game controls -->
-
-    <script>
-      function showDemo(demoId) {
-        // Hide all demos
-        document.querySelectorAll('section').forEach(s => s.style.display = 'none');
-        // Show selected demo
-        document.getElementById(demoId).style.display = 'block';
-      }
-
-      function shuffleCurrentDeck() {
-        const activeGame = document.querySelector('section:not([style*="display: none"]) card-game');
-        if (activeGame) {
-          activeGame.shuffle();
-          activeGame.reset();
-        }
-      }
-
-      // New single card functions
-      function nextCard() {
-        const activeDeck = document.querySelector('section:not([style*="display: none"]) a-deck');
-        if (activeDeck) {
-          activeDeck.nextCard();
-        }
-      }
-
-      function shuffleDeck() {
-        const activeDeck = document.querySelector('section:not([style*="display: none"]) a-deck');
-        if (activeDeck) {
-          activeDeck.shuffle();
-        }
-      }
-
-      // Add keyboard navigation
-      document.addEventListener('keydown', (e) => {
-        if (document.getElementById('single-card-demo').style.display !== 'none') {
-          if (e.key === 'ArrowRight' || e.key === ' ') {
-            e.preventDefault();
-            nextCard();
-          } else if (e.key === 'ArrowLeft') {
-            e.preventDefault();
-            const activeDeck = document.querySelector('#single-card-demo a-deck');
-            if (activeDeck) {
-              activeDeck.previousCard();
-            }
-          } else if (e.key === 's' || e.key === 'S') {
-            e.preventDefault();
-            shuffleDeck();
-          }
-        }
-      });
-
-      // Add swipe gestures for mobile
-      let startX = 0;
-      let startY = 0;
-
-      document.addEventListener('touchstart', (e) => {
-        startX = e.touches[0].clientX;
-        startY = e.touches[0].clientY;
-      });
-
-      document.addEventListener('touchmove', (e) => {
-        e.preventDefault(); // Prevent scrolling
-      }, { passive: false });
-
-      document.addEventListener('touchend', (e) => {
-        if (document.getElementById('single-card-demo').style.display !== 'none') {
-          const endX = e.changedTouches[0].clientX;
-          const endY = e.changedTouches[0].clientY;
-          const diffX = startX - endX;
-          const diffY = startY - endY;
-
-          // Horizontal swipe (left/right)
-          if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
-            if (diffX > 0) {
-              // Swipe left - next card
-              nextCard();
-            } else {
-              // Swipe right - previous card
-              const activeDeck = document.querySelector('#single-card-demo a-deck');
-              if (activeDeck) {
-                activeDeck.previousCard();
-              }
-            }
-          }
-        }
-      });
-    </script>
-    <script type=module src='./scripts/index.mjs'></script>
-  </body>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Poker Demo Lobby</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root { font-family: system-ui, sans-serif; background:#f9fafb; }
+    body  { margin:0; min-height:100vh; display:grid; place-items:center; }
+    main  { padding:2rem; text-align:center; }
+    h1 { margin:0 0 1rem; }
+    a.btn { display:inline-block; margin:.5rem; padding:1rem 2rem; color:#fff; background:#0a7; border-radius:10px; text-decoration:none; }
+    a.btn.secondary{ background:#276ef1; }
+    .card { max-width:780px; background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:2rem; box-shadow:0 3px 20px rgba(0,0,0,.06); }
+    ol { text-align:left; margin:1rem auto; max-width:560px; }
+    code { background:#f3f4f6; padding:.1rem .35rem; border-radius:6px; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>Poker Demo 1</h1>
+    <p>Select your role:</p>
+    <p>
+      <a class="btn" href="host.html">Host / DM</a>
+      <a class="btn secondary" href="player.html">Join as Player</a>
+    </p>
+    <h2>QR Signaling (no server)</h2>
+    <ol>
+      <li>Host opens <code>host.html</code> → Create Offer → <b>Show Offer QR</b>.</li>
+      <li>Player opens <code>player.html</code> → <b>Scan Offer QR</b> → Create Answer → <b>Show Answer QR</b>.</li>
+      <li>Host scans the player's Answer QR. Done.</li>
+    </ol>
+    <p>Fallback: you can still copy/paste the offer/answer blobs if camera access is blocked.</p>
+  </main>
+</body>
 </html>

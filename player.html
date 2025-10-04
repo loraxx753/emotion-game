@@ -1,0 +1,294 @@
+<!doctype html>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Poker Player (WebRTC + QR)</title>
+<style>
+  :root { font-family: system-ui, sans-serif; }
+  body { margin: 1.5rem; display: grid; gap: 1rem; grid-template-columns: 1fr 1fr; }
+  section { border: 1px solid #e5e7eb; border-radius: 12px; padding: 1rem; background:#fff; }
+  h2 { margin: 0 0 .5rem; }
+  textarea { width: 100%; height: 8rem; }
+  button { padding: .5rem .8rem; margin-right: .5rem; }
+  .hud { display:grid; gap:.5rem; }
+  code.card { display:inline-block; border:1px solid #999; border-radius:4px; padding:.1rem .35rem; margin-right:.25rem; }
+  .active { outline: 3px solid #0a7; }
+  dialog { border:none; border-radius:12px; box-shadow:0 20px 60px rgba(0,0,0,.25); }
+  #qrCanvas { display:block; margin:.5rem auto; }
+  #video { width:320px; height:auto; background:#000; }
+</style>
+
+<body>
+
+<section>
+  <h2>Signaling (Player)</h2>
+  <div>
+    <label>Your Name: <input id="playerName" value="Player-1"/></label>
+    <label style="margin-left:1rem">Starting Chips: <input id="startChips" type="number" value="1500"/></label>
+  </div>
+  <div class="row">
+    <button id="btnScanOfferQR">Scan Offer QR</button>
+    <button id="btnPasteOffer">Paste Offer</button>
+    <button id="btnCreateAnswer">Create Answer</button>
+    <button id="btnCopyAnswer">Copy Answer</button>
+    <button id="btnShowAnswerQR">Show Answer QR</button>
+  </div>
+  <label>Remote Offer (from host):</label>
+  <textarea id="remoteOffer" placeholder="Paste host's offer or scan QR"></textarea>
+  <label>Local Answer (to host):</label>
+  <textarea id="localAnswer" readonly></textarea>
+</section>
+
+<section>
+  <h2>Player Pane</h2>
+  <the-player id="me" data-turn="false" data-folded="false">
+    <player-identity name="Player-1"></player-identity>
+    <player-chips base="1500"></player-chips>
+    <player-bet current="0"></player-bet>
+    <player-hand></player-hand>
+  </the-player>
+
+  <div class="hud" id="hud">
+    <div id="who" ></div>
+    <div>Chips: <span id="chipsView">—</span> | Bet: <span id="betView">0</span> | Folded: <span id="foldedView">false</span></div>
+    <div>Hand: <span id="handView"></span></div>
+    <div>Board: <span id="boardView"></span></div>
+    <div class="row">
+      <button id="btnFold">Fold</button>
+      <button id="btnCall">Call</button>
+      <input id="raiseAmt" type="number" value="50" style="width:5rem" />
+      <button id="btnRaise">Raise</button>
+    </div>
+  </div>
+</section>
+
+<!-- QR Modal -->
+<dialog id="qrDialog">
+  <form method="dialog">
+    <h3 id="qrTitle">QR</h3>
+    <canvas id="qrCanvas" width="320" height="320"></canvas>
+    <video id="video" playsinline></video>
+    <div style="text-align:center;margin-top:.5rem">
+      <button>Close</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+
+<script type="module">
+/*** ---------- Small helpers ---------- ***/
+const cardText = ({r,s}) => `${r}${s[0].toUpperCase()}`;
+
+/*** ---------- Custom Element: <the-player> (functional style) ---------- ***/
+customElements.define('the-player', class extends HTMLElement {
+  read(){
+    return {
+      id: this.id || 'me',
+      name: this.querySelector('player-identity')?.getAttribute('name') || 'Player',
+      chips: +(this.querySelector('player-chips')?.getAttribute('base') || 0),
+      bet: +(this.querySelector('player-bet')?.getAttribute('current') || 0),
+      folded: this.getAttribute('data-folded') === 'true',
+      turn: this.getAttribute('data-turn') === 'true',
+      hand: [...this.querySelectorAll('player-hand card')].map(c=>({r:c.getAttribute('rank'), s:c.getAttribute('suit')}))
+    };
+  }
+  reduce(state, action){
+    switch(action.type){
+      case 'SET_PUBLIC': return { ...state, turn: action.turn ?? state.turn };
+      case 'SET_HOLE':   return { ...state, hand: action.cards.slice() };
+      case 'SET_CHIPS_BET': return { ...state, chips: action.chips, bet: action.bet };
+      case 'SET_FOLDED': return { ...state, folded: !!action.folded };
+      default: return state;
+    }
+  }
+  write(state){
+    this.querySelector('player-identity')?.setAttribute('name', state.name);
+    this.querySelector('player-chips')?.setAttribute('base', String(state.chips));
+    this.querySelector('player-bet')?.setAttribute('current', String(state.bet));
+    this.setAttribute('data-folded', String(state.folded));
+    this.setAttribute('data-turn', String(state.turn));
+    const handRoot = this.querySelector('player-hand'); handRoot.replaceChildren();
+    state.hand.forEach(c => {
+      const el = document.createElement('card');
+      el.setAttribute('rank', c.r); el.setAttribute('suit', c.s);
+      handRoot.appendChild(el);
+    });
+    renderHUD(state);
+  }
+});
+
+function renderHUD(state){
+  const who = document.getElementById('who');
+  who.textContent = `${state.name} ${state.turn?'(Your turn)':''}`;
+  document.getElementById('hud').classList.toggle('active', state.turn);
+  document.getElementById('chipsView').textContent = String(state.chips);
+  document.getElementById('betView').textContent = String(state.bet);
+  document.getElementById('foldedView').textContent = String(state.folded);
+  const hv = document.getElementById('handView'); hv.innerHTML='';
+  state.hand.forEach(c => { const code = document.createElement('code'); code.className='card'; code.textContent = cardText(c); hv.appendChild(code); });
+}
+
+/*** ---------- RTC (offer scan + answer QR) ---------- ***/
+const btnScanOfferQR = document.getElementById('btnScanOfferQR');
+const btnPasteOffer  = document.getElementById('btnPasteOffer');
+const btnCreateAnswer= document.getElementById('btnCreateAnswer');
+const btnCopyAnswer  = document.getElementById('btnCopyAnswer');
+const btnShowAnswerQR= document.getElementById('btnShowAnswerQR');
+const taRemoteOffer  = document.getElementById('remoteOffer');
+const taLocalAnswer  = document.getElementById('localAnswer');
+
+const qrDialog = document.getElementById('qrDialog');
+const qrCanvas = document.getElementById('qrCanvas');
+const video    = document.getElementById('video');
+const qrTitle  = document.getElementById('qrTitle');
+
+let pc, dc, scanning=false, rafId=0;
+
+btnScanOfferQR.onclick = async () => {
+  qrTitle.textContent = 'Scan Host Offer';
+  await startScan((payload) => {
+    if (!payload.startsWith('O:')) return false;
+    const json = LZString.decompressFromEncodedURIComponent(payload.slice(2));
+    taRemoteOffer.value = json;
+    qrDialog.close(); stopScan();
+    return true;
+  });
+};
+
+btnPasteOffer.onclick = async () => {
+  const offerTxt = taRemoteOffer.value.trim(); if (!offerTxt) return alert('Paste or scan an offer first');
+  const offer = JSON.parse(offerTxt);
+  pc = new RTCPeerConnection();
+  pc.ondatachannel = (ev) => { dc = ev.channel; setupDC(dc); };
+  await pc.setRemoteDescription(offer);
+};
+
+btnCreateAnswer.onclick = async () => {
+  if (!pc) return alert('Scan or paste offer first');
+  pc.onicecandidate = () => { taLocalAnswer.value = JSON.stringify(pc.localDescription); };
+  const ans = await pc.createAnswer(); await pc.setLocalDescription(ans);
+  taLocalAnswer.value = JSON.stringify(pc.localDescription);
+};
+
+btnCopyAnswer.onclick = async () => { await navigator.clipboard.writeText(taLocalAnswer.value); alert('Answer copied'); };
+
+btnShowAnswerQR.onclick = () => {
+  if (!taLocalAnswer.value.trim()) return alert('Create Answer first');
+  const compressed = LZString.compressToEncodedURIComponent(taLocalAnswer.value);
+  showQR(`A:${compressed}`);
+};
+
+function setupDC(dc){
+  dc.onopen = () => {
+    const name = document.getElementById('playerName').value.trim() || 'Player';
+    const chips = Number(document.getElementById('startChips').value) || 1500;
+    const me = document.getElementById('me');
+    me.querySelector('player-identity').setAttribute('name', name);
+    me.querySelector('player-chips').setAttribute('base', String(chips));
+    dc.send(JSON.stringify({ type:'HELLO', player_id: name, name, chips }));
+  };
+  dc.onmessage = (ev) => {
+    const msg = JSON.parse(ev.data);
+    const me = document.getElementById('me');
+    const state = me.read();
+
+    if (msg.type === 'ACCEPT'){ /* noop */ }
+    if (msg.type === 'TABLE'){
+      const isMyTurn = msg.state.seats.find(s=>s.id===state.name)?.active || false;
+      me.write(me.reduce(state, { type:'SET_PUBLIC', turn:isMyTurn }));
+      const bv = document.getElementById('boardView'); bv.innerHTML='';
+      msg.state.community.forEach(c => {
+        const code = document.createElement('code'); code.className='card'; code.textContent = cardText(c);
+        bv.appendChild(code);
+      });
+      const selfSeat = msg.state.seats.find(s=>s.id===state.name);
+      if (selfSeat){
+        me.write(me.reduce(me.read(), { type:'SET_CHIPS_BET', chips:selfSeat.chips??state.chips, bet:selfSeat.bet??state.bet }));
+      }
+    }
+    if (msg.type === 'TURN'){
+      me.write(me.reduce(state, { type:'SET_PUBLIC', turn: msg.player === state.name }));
+    }
+    if (msg.type === 'HOLE'){
+      me.write(me.reduce(state, { type:'SET_HOLE', cards: msg.cards }));
+    }
+  };
+}
+
+/*** ---------- Actions ---------- ***/
+document.getElementById('btnFold').onclick = () => sendIntent('FOLD');
+document.getElementById('btnCall').onclick = () => sendIntent('CALL');
+document.getElementById('btnRaise').onclick = () => {
+  const amt = Number(document.getElementById('raiseAmt').value)||50;
+  sendIntent('RAISE', { amount: amt });
+};
+function sendIntent(action, extra={}){
+  if (!dc || dc.readyState!=='open') return;
+  const name = document.getElementById('playerName').value.trim() || 'Player';
+  dc.send(JSON.stringify({ type:'INTENT', player: name, action, ...extra }));
+}
+
+/*** ---------- QR helpers ---------- ***/
+function showQR(text){
+  qrTitle.textContent = 'Share Answer (QR)';
+  const ctx = qrCanvas.getContext('2d'); ctx.clearRect(0,0,qrCanvas.width,qrCanvas.height);
+  const tmp = document.createElement('div');
+  
+  // Create QR code and wait for it to be ready
+  const qr = new QRCode(tmp, { 
+    text, 
+    width: 320, 
+    height: 320, 
+    correctLevel: QRCode.CorrectLevel.L 
+  });
+  
+  // Give QR code library time to generate, then draw to canvas
+  setTimeout(() => {
+    const img = tmp.querySelector('img') || tmp.querySelector('canvas');
+    if (img instanceof HTMLImageElement) {
+      if (img.complete) {
+        ctx.drawImage(img, 0, 0, 320, 320);
+      } else {
+        img.onload = () => { 
+          ctx.drawImage(img, 0, 0, 320, 320); 
+        };
+      }
+    } else if (img instanceof HTMLCanvasElement) {
+      ctx.drawImage(img, 0, 0, 320, 320);
+    }
+  }, 100); // Small delay to ensure QR generation is complete
+  
+  video.style.display = 'none';
+  qrDialog.showModal();
+}
+async function startScan(onDecoded){
+  video.style.display = 'block';
+  const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+  video.srcObject = stream; await video.play();
+  let running = true;
+  qrDialog.addEventListener('close', () => { running=false; stopScan(); }, { once:true });
+  const off = document.createElement('canvas'); const ctx = off.getContext('2d');
+  const loop = () => {
+    if (!running) return;
+    const w = video.videoWidth, h = video.videoHeight;
+    off.width = w; off.height = h; ctx.drawImage(video, 0, 0, w, h);
+    const img = ctx.getImageData(0, 0, w, h);
+    const code = jsQR(img.data, w, h, { inversionAttempts: "dontInvert" });
+    if (code && code.data) {
+      const ok = onDecoded(code.data);
+      if (ok) return;
+    }
+    rafId = requestAnimationFrame(loop);
+  };
+  qrDialog.showModal();
+  loop();
+}
+function stopScan(){
+  cancelAnimationFrame(rafId);
+  const s = video.srcObject; if (s) { s.getTracks().forEach(t=>t.stop()); video.srcObject = null; }
+}
+</script>
+</body>
+</html>

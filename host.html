@@ -1,0 +1,349 @@
+<!doctype html>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Poker Host (WebRTC + QR)</title>
+<style>
+  :root { font-family: system-ui, sans-serif; }
+  body { margin: 1.5rem; display: grid; gap: 1rem; grid-template-columns: 1fr 1fr; }
+  section { border: 1px solid #e5e7eb; border-radius: 12px; padding: 1rem; background:#fff; }
+  h2 { margin: 0 0 .5rem; }
+  textarea { width: 100%; height: 8rem; }
+  button { padding: .5rem .8rem; margin-right: .5rem; }
+  .row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+  .seat { padding: .5rem; border: 1px dashed #aaa; border-radius: 6px; min-width: 14rem; margin:.25rem 0; }
+  .active { outline: 3px solid #0a7; }
+  code.card { display:inline-block; border:1px solid #999; border-radius:4px; padding:.1rem .35rem; margin-right:.25rem; }
+  /* QR modal */
+  dialog { border:none; border-radius:12px; box-shadow:0 20px 60px rgba(0,0,0,.25); }
+  #qrCanvas { display:block; margin: .5rem auto; }
+  #video { width:320px; height:auto; background:#000; }
+</style>
+
+<body>
+<section>
+  <h2>Signaling (Host)</h2>
+  <div class="row">
+    <button id="btnCreateOffer">Create Offer</button>
+    <button id="btnCopyOffer">Copy Offer</button>
+    <button id="btnShowOfferQR">Show Offer QR</button>
+    <button id="btnPasteAnswer">Paste Answer</button>
+    <button id="btnScanAnswerQR">Scan Answer QR</button>
+  </div>
+  <label>Local Offer (share to a player):</label>
+  <textarea id="localOffer" readonly></textarea>
+  <label>Remote Answer (paste from a player):</label>
+  <textarea id="remoteAnswer" placeholder="Paste player's answer here"></textarea>
+  <p>Repeat the handshake for each additional player. One <b>host.html</b> serves the whole table.</p>
+</section>
+
+<section>
+  <h2>Table Controls</h2>
+  <div class="row">
+    <label>Blinds:</label><input id="blinds" value="25/50" />
+    <button id="btnNewHand">New Hand</button>
+    <button id="btnDealFlop">Deal Flop</button>
+    <button id="btnDealTurn">Deal Turn</button>
+    <button id="btnDealRiver">Deal River</button>
+  </div>
+  <div class="row">
+    <label>Give Turn to:</label>
+    <select id="selTurn"></select>
+    <button id="btnSetTurn">Set Turn</button>
+  </div>
+</section>
+
+<section>
+  <h2>Table State</h2>
+  <poker-table id="table" level="25/50" hand="0">
+    <seats></seats>
+    <community></community>
+    <pot total="0"></pot>
+  </poker-table>
+  <div id="seatsView"></div>
+  <div id="boardView"></div>
+</section>
+
+<!-- QR Modal -->
+<dialog id="qrDialog">
+  <form method="dialog">
+    <h3 id="qrTitle">QR</h3>
+    <canvas id="qrCanvas" width="320" height="320"></canvas>
+    <video id="video" playsinline></video>
+    <div style="text-align:center;margin-top:.5rem">
+      <button>Close</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+
+<script type="module">
+/*** ---------- Pure helpers ---------- ***/
+const suits = ["club","diamond","heart","spade"];
+const ranks = ["2","3","4","5","6","7","8","9","T","J","Q","K","A"];
+const newDeck = () => { const d=[]; for (const s of suits) for (const r of ranks) d.push({r,s});
+  for (let i=d.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [d[i],d[j]]=[d[j],d[i]]; } return d; };
+const deal = (deck, n) => ({ cards: deck.slice(0,n), rest: deck.slice(n) });
+const cardText = ({r,s}) => `${r}${s[0].toUpperCase()}`;
+
+/*** ---------- Custom Element: <poker-table> (functional reducer) ---------- ***/
+customElements.define('poker-table', class extends HTMLElement {
+  connectedCallback(){ this.#renderViews(); }
+  #renderViews(){
+    const seats = [...this.querySelectorAll('seat')];
+    const seatsView = document.getElementById('seatsView'); seatsView.innerHTML='';
+    seats.forEach(seat => {
+      const div = document.createElement('div'); div.className='seat'+(seat.dataset.active==='true'?' active':'');
+      const name = seat.getAttribute('player') ?? '(empty)';
+      div.textContent = `Seat ${seat.getAttribute('pos')}: ${name} | chips=${seat.getAttribute('chips')||'-'} | bet=${seat.getAttribute('bet')||'0'} | folded=${seat.getAttribute('folded')||'false'}`;
+      seatsView.appendChild(div);
+    });
+    const boardView = document.getElementById('boardView'); boardView.innerHTML='';
+    const comm = this.querySelector('community');
+    const stage = (lab, sel) => {
+      const cards = [...comm.querySelectorAll(`card[stage="${sel}"]`)];
+      if (!cards.length) return;
+      const p = document.createElement('p'); p.textContent = `${lab}: `;
+      cards.forEach(c => {
+        const code = document.createElement('code'); code.className='card';
+        code.textContent = cardText({ r:c.getAttribute('rank'), s:c.getAttribute('suit') });
+        p.appendChild(code);
+      });
+      boardView.appendChild(p);
+    };
+    stage('Flop','flop'); stage('Turn','turn'); stage('River','river');
+  }
+  reduce(state, action){
+    switch(action.type){
+      case 'NEW_HAND': return { ...state, hand: state.hand+1, pot:0, community:[], seats: state.seats.map(s=>({...s, bet:0, folded:false, active:false, hand:[]})) };
+      case 'SET_TURN': return { ...state, seats: state.seats.map(s=>({...s, active: s.id===action.playerId })) };
+      case 'SET_SEATS': return { ...state, seats: action.seats.slice() };
+      case 'SET_COMMUNITY': return { ...state, community: action.cards.slice() };
+      case 'SET_POT': return { ...state, pot: action.total };
+      default: return state;
+    }
+  }
+  write(state){
+    this.setAttribute('hand', String(state.hand));
+    this.querySelector('pot').setAttribute('total', String(state.pot));
+    const seatsRoot = this.querySelector('seats'); seatsRoot.replaceChildren();
+    state.seats.forEach((s,i)=>{
+      const el = document.createElement('seat');
+      el.setAttribute('pos', String(i+1));
+      el.setAttribute('player', s.id);
+      if (s.chips!=null) el.setAttribute('chips', String(s.chips));
+      el.setAttribute('bet', String(s.bet||0));
+      el.setAttribute('folded', String(!!s.folded));
+      el.dataset.active = s.active ? 'true' : 'false';
+      seatsRoot.appendChild(el);
+    });
+    const commRoot = this.querySelector('community'); commRoot.replaceChildren();
+    state.community.forEach((c,i)=>{
+      const el = document.createElement('card');
+      el.setAttribute('stage', i<3 ? 'flop': i===3 ? 'turn' : 'river');
+      el.setAttribute('rank', c.r); el.setAttribute('suit', c.s);
+      commRoot.appendChild(el);
+    });
+    this.#renderViews();
+  }
+});
+
+/*** ---------- Host state, peers, dispatch ---------- ***/
+const peers = new Map(); // playerId -> { pc, dc }
+const tableEl = document.getElementById('table');
+const initialTableState = () => ({ hand: Number(tableEl.getAttribute('hand'))||0, pot: 0, community: [], seats: [] });
+let tableState = initialTableState();
+
+function tableDispatch(action){
+  const next = tableEl.reduce(tableState, action);
+  tableState = next;
+  tableEl.write(tableState);
+  broadcast({ type:'TABLE', state: publicTableSnapshot() });
+}
+function publicTableSnapshot(){
+  return {
+    hand: tableState.hand,
+    pot: tableState.pot,
+    community: tableState.community,
+    seats: tableState.seats.map(s=>({ id:s.id, chips:s.chips, bet:s.bet, folded:s.folded, active:s.active }))
+  };
+}
+function broadcast(msg){ for (const {dc} of peers.values()){ if (dc.readyState === 'open') dc.send(JSON.stringify(msg)); } }
+function sendTo(playerId, msg){ const p = peers.get(playerId); if (p && p.dc.readyState === 'open') p.dc.send(JSON.stringify(msg)); }
+
+/*** ---------- Signaling: UI (copy/paste + QR) ---------- ***/
+const btnCreateOffer = document.getElementById('btnCreateOffer');
+const btnCopyOffer   = document.getElementById('btnCopyOffer');
+const btnShowOfferQR = document.getElementById('btnShowOfferQR');
+const btnPasteAnswer = document.getElementById('btnPasteAnswer');
+const btnScanAnswerQR= document.getElementById('btnScanAnswerQR');
+const taLocalOffer   = document.getElementById('localOffer');
+const taRemoteAnswer = document.getElementById('remoteAnswer');
+const qrDialog = document.getElementById('qrDialog');
+const qrCanvas = document.getElementById('qrCanvas');
+const video    = document.getElementById('video');
+const qrTitle  = document.getElementById('qrTitle');
+
+let deck = newDeck();
+let scanning = false, rafId = 0;
+
+btnCreateOffer.onclick = async () => {
+  const pc = new RTCPeerConnection();
+  const dc = pc.createDataChannel('rpg', { ordered:true });
+  const tempId = 'P'+Math.random().toString(36).slice(2,8);
+  setupDC(tempId, dc, pc);
+  pc.onicecandidate = () => { taLocalOffer.value = JSON.stringify(pc.localDescription); };
+  const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
+  taLocalOffer.value = JSON.stringify(pc.localDescription);
+  peers.set(tempId, { pc, dc, temp:true });
+};
+
+btnCopyOffer.onclick = async () => { await navigator.clipboard.writeText(taLocalOffer.value); alert('Offer copied'); };
+
+btnShowOfferQR.onclick = () => {
+  if (!taLocalOffer.value.trim()) return alert('Create Offer first');
+  const compressed = LZString.compressToEncodedURIComponent(taLocalOffer.value);
+  showQR(`O:${compressed}`);
+};
+
+btnPasteAnswer.onclick = async () => {
+  const answer = JSON.parse(taRemoteAnswer.value.trim());
+  const tempId = [...peers.keys()].reverse().find(id => peers.get(id).temp);
+  if (!tempId) return alert('No pending offer');
+  await peers.get(tempId).pc.setRemoteDescription(answer);
+  alert('Answer set. Wait for HELLO.');
+  taRemoteAnswer.value = '';
+};
+
+btnScanAnswerQR.onclick = async () => {
+  qrTitle.textContent = 'Scan Player Answer';
+  await startScan(async (payload) => {
+    if (!payload.startsWith('A:')) return false;
+    const json = LZString.decompressFromEncodedURIComponent(payload.slice(2));
+    const answer = JSON.parse(json);
+    const tempId = [...peers.keys()].reverse().find(id => peers.get(id).temp);
+    if (!tempId) { alert('No pending offer'); return true; }
+    await peers.get(tempId).pc.setRemoteDescription(answer);
+    alert('Answer set. Wait for HELLO.');
+    return true;
+  });
+};
+
+/*** ---------- DC handlers ---------- ***/
+function setupDC(tempId, dc, pc){
+  dc.onopen = () => console.log('dc open (host)');
+  dc.onmessage = (ev) => {
+    const msg = JSON.parse(ev.data);
+    if (msg.type === 'HELLO'){
+      const playerId = msg.player_id || msg.name || ('P'+Math.random().toString(36).slice(2,8));
+      const rec = peers.get(tempId); peers.delete(tempId); peers.set(playerId, { pc, dc });
+      const seats = tableState.seats.some(s=>s.id===playerId)
+        ? tableState.seats
+        : tableState.seats.concat([{ id:playerId, chips: msg.chips ?? 1500, bet:0, folded:false, active:false, hand:[] }]);
+      tableDispatch({ type:'SET_SEATS', seats });
+      sendTo(playerId, { type:'ACCEPT', ruleset_version: 'poker-min@0.1.0' });
+      sendTo(playerId, { type:'TABLE', state: publicTableSnapshot() });
+      refreshTurnSelect();
+    }
+    else if (msg.type === 'INTENT'){
+      const pid = msg.player;
+      const seat = tableState.seats.find(s=>s.id===pid); if (!seat) return;
+      if (msg.action === 'FOLD'){
+        seat.folded = true; seat.active = false; tableDispatch({ type:'SET_SEATS', seats: tableState.seats });
+      }
+      if (msg.action === 'CALL'){
+        const toCall = Math.max(...tableState.seats.map(s=>s.bet||0)) - (seat.bet||0);
+        const pay = Math.min(seat.chips||0, toCall);
+        seat.chips -= pay; seat.bet += pay; tableState.pot += pay;
+        tableDispatch({ type:'SET_SEATS', seats: tableState.seats }); tableDispatch({ type:'SET_POT', total: tableState.pot });
+      }
+      if (msg.action === 'RAISE'){
+        const minRaise = 50;
+        const raiseTo = Math.max(...tableState.seats.map(s=>s.bet||0)) + (msg.amount||minRaise);
+        const need = raiseTo - (seat.bet||0);
+        const pay = Math.min(seat.chips||0, need);
+        seat.chips -= pay; seat.bet += pay; tableState.pot += pay;
+        tableDispatch({ type:'SET_SEATS', seats: tableState.seats }); tableDispatch({ type:'SET_POT', total: tableState.pot });
+      }
+    }
+  };
+}
+
+/*** ---------- Dealer controls ---------- ***/
+document.getElementById('btnNewHand').onclick = () => {
+  deck = newDeck();
+  tableDispatch({ type:'NEW_HAND' });
+  for (const pid of peers.keys()){
+    const seat = tableState.seats.find(s=>s.id===pid); if (!seat) continue;
+    const { cards, rest } = deal(deck, 2); deck = rest;
+    sendTo(pid, { type:'HOLE', cards });
+  }
+  document.getElementById('boardView').innerHTML='';
+};
+document.getElementById('btnDealFlop').onclick = () => {
+  const { cards, rest } = deal(deck, 3); deck = rest;
+  tableDispatch({ type:'SET_COMMUNITY', cards });
+};
+document.getElementById('btnDealTurn').onclick = () => {
+  const prev = tableState.community;
+  const { cards, rest } = deal(deck, 1); deck = rest;
+  tableDispatch({ type:'SET_COMMUNITY', cards: prev.concat(cards) });
+};
+document.getElementById('btnDealRiver').onclick = () => {
+  const prev = tableState.community;
+  const { cards, rest } = deal(deck, 1); deck = rest;
+  tableDispatch({ type:'SET_COMMUNITY', cards: prev.concat(cards) });
+};
+const selTurn = document.getElementById('selTurn');
+function refreshTurnSelect(){ selTurn.replaceChildren(); tableState.seats.forEach(s=>{ const o=document.createElement('option'); o.value=s.id; o.textContent=s.id; selTurn.appendChild(o); }); }
+document.getElementById('btnSetTurn').onclick = () => { const pid = selTurn.value; tableDispatch({ type:'SET_TURN', playerId: pid }); broadcast({ type:'TURN', player: pid }); };
+document.getElementById('blinds').onchange = (e) => { tableEl.setAttribute('level', e.target.value); };
+
+/*** ---------- QR encode/decode plumbing ---------- ***/
+function showQR(text){
+  qrTitle.textContent = 'Share Offer (QR)';
+  const dlg = qrDialog; const ctx = qrCanvas.getContext('2d'); ctx.clearRect(0,0,qrCanvas.width,qrCanvas.height);
+  // Render QR into a temp div then draw to canvas (qrcode.js API)
+  const tmp = document.createElement('div');
+  new QRCode(tmp, { text, width: 320, height: 320, correctLevel: QRCode.CorrectLevel.L });
+  const img = tmp.querySelector('img') || tmp.querySelector('canvas');
+  if (img instanceof HTMLImageElement) {
+    img.onload = () => { ctx.drawImage(img, 0, 0, 320, 320); URL.revokeObjectURL(img.src); };
+  } else if (img instanceof HTMLCanvasElement) {
+    ctx.drawImage(img, 0, 0, 320, 320);
+  }
+  video.style.display = 'none';
+  dlg.showModal();
+}
+async function startScan(onDecoded){
+  const dlg = qrDialog;
+  qrTitle.textContent = 'Scanning…';
+  video.style.display = 'block';
+  const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+  video.srcObject = stream; await video.play();
+  scanning = true;
+  const off = document.createElement('canvas'); const ctx = off.getContext('2d');
+  const loop = async () => {
+    if (!scanning) return;
+    const w = video.videoWidth, h = video.videoHeight;
+    off.width = w; off.height = h; ctx.drawImage(video, 0, 0, w, h);
+    const img = ctx.getImageData(0, 0, w, h);
+    const code = jsQR(img.data, w, h, { inversionAttempts: "dontInvert" });
+    if (code && code.data) {
+      const ok = await onDecoded(code.data);
+      if (ok) { stopScan(); dlg.close(); return; }
+    }
+    rafId = requestAnimationFrame(loop);
+  };
+  dlg.addEventListener('close', stopScan, { once:true });
+  loop();
+}
+function stopScan(){
+  scanning = false; cancelAnimationFrame(rafId);
+  const s = video.srcObject; if (s) { s.getTracks().forEach(t=>t.stop()); video.srcObject = null; }
+}
+</script>
+</body>
+</html>
