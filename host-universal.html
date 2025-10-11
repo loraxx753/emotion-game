@@ -1,0 +1,345 @@
+<!doctype html>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Game Night Host</title>
+<style>
+  :root { 
+    font-family: system-ui, sans-serif; 
+    --primary: #2563eb;
+    --primary-light: #dbeafe;
+    --success: #059669;
+    --border: #e5e7eb;
+  }
+  body { 
+    margin: 1.5rem; 
+    display: grid; 
+    gap: 1rem; 
+    grid-template-columns: 1fr 1fr; 
+    background: #f8fafc;
+  }
+  section { 
+    border: 1px solid var(--border); 
+    border-radius: 12px; 
+    padding: 1rem; 
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  h2 { margin: 0 0 .5rem; color: #1f2937; }
+  h3 { margin: 1rem 0 .5rem; color: #374151; font-size: 1.1em; }
+  button { 
+    padding: .5rem 1rem; 
+    margin-right: .5rem; 
+    border: none;
+    border-radius: 6px;
+    background: var(--primary);
+    color: white;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  button:hover { opacity: 0.9; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+  .game-selector { 
+    display: grid; 
+    gap: .5rem; 
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
+  .game-card {
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .game-card:hover {
+    border-color: var(--primary);
+    background: var(--primary-light);
+  }
+  .game-card.selected {
+    border-color: var(--primary);
+    background: var(--primary-light);
+  }
+  .status-badge {
+    display: inline-block;
+    padding: .25rem .5rem;
+    border-radius: 4px;
+    font-size: .875rem;
+    font-weight: 500;
+  }
+  .status-waiting { background: #fef3c7; color: #92400e; }
+  .status-active { background: #d1fae5; color: #065f46; }
+  .players-list { 
+    list-style: none; 
+    padding: 0; 
+    margin: 0;
+  }
+  .players-list li {
+    padding: .5rem;
+    margin: .25rem 0;
+    background: #f9fafb;
+    border-radius: 4px;
+    border-left: 3px solid var(--success);
+  }
+  #gameArea {
+    grid-column: 1 / -1;
+    display: none;
+  }
+</style>
+
+<body>
+
+<!-- Game Selection -->
+<section id="gameSelection">
+  <h2>Choose Your Game</h2>
+  <div class="game-selector">
+    <div class="game-card" data-game="poker">
+      <h3>🃏 Poker</h3>
+      <p>Texas Hold'em, chip management, betting rounds</p>
+    </div>
+    <div class="game-card" data-game="blackjack">
+      <h3>🎯 Blackjack</h3>
+      <p>21, dealer vs players, card counting</p>
+    </div>
+    <div class="game-card" data-game="boardgame">
+      <h3>🎲 Board Game</h3>
+      <p>Custom boards, dice, tokens, turn management</p>
+    </div>
+    <div class="game-card" data-game="custom">
+      <h3>⚙️ Custom</h3>
+      <p>Build your own game with basic components</p>
+    </div>
+  </div>
+</section>
+
+<!-- Room Management -->
+<section id="roomSection">
+  <h2>Game Room</h2>
+  <div id="preRoom">
+    <button id="btnCreateRoom" disabled>Create Room</button>
+    <p class="status-badge status-waiting">Select a game first</p>
+  </div>
+  
+  <div id="roomActive" style="display: none;">
+    <div class="row">
+      <span class="status-badge status-active">Room Active</span>
+      <strong>Code: <span id="roomCode"></span></strong>
+    </div>
+    <p>Share this code with players to join your <span id="selectedGameName">game</span>!</p>
+    
+    <h3>Connected Players</h3>
+    <ul id="playersList" class="players-list">
+      <li><em>No players yet...</em></li>
+    </ul>
+  </div>
+</section>
+
+<!-- Dynamic Game Area -->
+<section id="gameArea">
+  <h2>Game Controls</h2>
+  <div id="gameContent">
+    <!-- Game-specific UI will be loaded here -->
+  </div>
+</section>
+
+<script src="/socket.io/socket.io.js"></script>
+<script type="module">
+
+/*** ---------- Universal Game Host Framework ---------- ***/
+class GameHost {
+  constructor() {
+    this.socket = io();
+    this.currentGame = null;
+    this.gameModule = null;
+    this.roomCode = null;
+    this.players = new Set();
+    this.isHost = false;
+    
+    this.setupEventListeners();
+    this.setupSocketHandlers();
+  }
+  
+  setupEventListeners() {
+    // Game selection
+    document.querySelectorAll('.game-card').forEach(card => {
+      card.addEventListener('click', () => this.selectGame(card.dataset.game));
+    });
+    
+    // Room creation
+    document.getElementById('btnCreateRoom').addEventListener('click', () => {
+      this.createRoom();
+    });
+  }
+  
+  setupSocketHandlers() {
+    this.socket.on('player-joined', (data) => {
+      console.log('Player joined:', data.playerId);
+      this.players.add(data.playerId);
+      this.updatePlayersList();
+      
+      // Notify game module of new player
+      if (this.gameModule && this.gameModule.onPlayerJoined) {
+        this.gameModule.onPlayerJoined(data);
+      }
+    });
+    
+    this.socket.on('player-left', (data) => {
+      console.log('Player left:', data.playerId);
+      this.players.delete(data.playerId);
+      this.updatePlayersList();
+      
+      if (this.gameModule && this.gameModule.onPlayerLeft) {
+        this.gameModule.onPlayerLeft(data);
+      }
+    });
+    
+    this.socket.on('message', (msg) => {
+      // Forward messages to the game module
+      if (this.gameModule && this.gameModule.onMessage) {
+        this.gameModule.onMessage(msg);
+      }
+    });
+  }
+  
+  async selectGame(gameType) {
+    // Clear previous selection
+    document.querySelectorAll('.game-card').forEach(card => {
+      card.classList.remove('selected');
+    });
+    
+    // Select new game
+    const selectedCard = document.querySelector(`[data-game="${gameType}"]`);
+    selectedCard.classList.add('selected');
+    
+    this.currentGame = gameType;
+    document.getElementById('selectedGameName').textContent = selectedCard.querySelector('h3').textContent;
+    
+    // Enable room creation
+    const createBtn = document.getElementById('btnCreateRoom');
+    createBtn.disabled = false;
+    createBtn.parentElement.querySelector('.status-badge').textContent = 'Ready to create room';
+    createBtn.parentElement.querySelector('.status-badge').className = 'status-badge status-active';
+    
+    // Load game module
+    try {
+      await this.loadGameModule(gameType);
+    } catch (error) {
+      console.error('Failed to load game module:', error);
+      alert(`Failed to load ${gameType} module. Using basic mode.`);
+    }
+  }
+  
+  async loadGameModule(gameType) {
+    // Dynamic import of game modules
+    const gameModulePath = `./games/${gameType}.js`;
+    
+    try {
+      const module = await import(gameModulePath);
+      this.gameModule = new module.default(this);
+      console.log(`Loaded ${gameType} game module`);
+    } catch (error) {
+      console.warn(`Game module ${gameType} not found, using basic mode`);
+      // Fallback to basic message relay
+      this.gameModule = new BasicGameModule(this);
+    }
+  }
+  
+  createRoom() {
+    if (!this.currentGame) {
+      alert('Please select a game first');
+      return;
+    }
+    
+    this.socket.emit('create-room', (response) => {
+      if (response.success) {
+        this.roomCode = response.roomCode;
+        this.isHost = true;
+        
+        // Update UI
+        document.getElementById('roomCode').textContent = this.roomCode;
+        document.getElementById('preRoom').style.display = 'none';
+        document.getElementById('roomActive').style.display = 'block';
+        document.getElementById('gameArea').style.display = 'block';
+        
+        // Initialize game module
+        if (this.gameModule && this.gameModule.onRoomCreated) {
+          this.gameModule.onRoomCreated(this.roomCode);
+        }
+        
+        console.log('Room created:', this.roomCode);
+      } else {
+        console.error('Failed to create room:', response.error);
+        alert('Failed to create room: ' + response.error);
+      }
+    });
+  }
+  
+  updatePlayersList() {
+    const list = document.getElementById('playersList');
+    list.innerHTML = '';
+    
+    if (this.players.size === 0) {
+      const li = document.createElement('li');
+      li.innerHTML = '<em>No players yet...</em>';
+      list.appendChild(li);
+    } else {
+      for (const playerId of this.players) {
+        const li = document.createElement('li');
+        li.textContent = playerId;
+        list.appendChild(li);
+      }
+    }
+  }
+  
+  // API for game modules
+  broadcast(message) {
+    if (this.isHost && this.socket.connected) {
+      this.socket.emit('relay-message', message);
+    }
+  }
+  
+  sendToPlayer(playerId, message) {
+    if (this.isHost && this.socket.connected) {
+      this.socket.emit('relay-message', { ...message, targetPlayer: playerId });
+    }
+  }
+  
+  setGameUI(htmlContent) {
+    document.getElementById('gameContent').innerHTML = htmlContent;
+  }
+}
+
+// Basic fallback game module
+class BasicGameModule {
+  constructor(host) {
+    this.host = host;
+  }
+  
+  onRoomCreated(roomCode) {
+    this.host.setGameUI(`
+      <h3>Basic Game Mode</h3>
+      <p>Room ${roomCode} is active. Game-specific modules will provide richer functionality.</p>
+      <button onclick="this.parentElement.host.broadcast({type: 'ping', message: 'Hello players!'})">
+        Send Test Message
+      </button>
+    `);
+  }
+  
+  onPlayerJoined(data) {
+    console.log('Basic module: player joined', data.playerId);
+  }
+  
+  onPlayerLeft(data) {
+    console.log('Basic module: player left', data.playerId);
+  }
+  
+  onMessage(msg) {
+    console.log('Basic module: received message', msg);
+  }
+}
+
+// Initialize the host
+window.gameHost = new GameHost();
+
+</script>
+</body>
+</html>
