@@ -1,335 +1,345 @@
 <!doctype html>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Poker Host (WebRTC + QR)</title>
+<title>Game Night Host</title>
 <style>
-  :root { font-family: system-ui, sans-serif; }
-  body { margin: 1.5rem; display: grid; gap: 1rem; grid-template-columns: 1fr 1fr; }
-  section { border: 1px solid #e5e7eb; border-radius: 12px; padding: 1rem; background:#fff; }
-  h2 { margin: 0 0 .5rem; }
-  textarea { width: 100%; height: 8rem; }
-  button { padding: .5rem .8rem; margin-right: .5rem; }
+  :root { 
+    font-family: system-ui, sans-serif; 
+    --primary: #2563eb;
+    --primary-light: #dbeafe;
+    --success: #059669;
+    --border: #e5e7eb;
+  }
+  body { 
+    margin: 1.5rem; 
+    display: grid; 
+    gap: 1rem; 
+    grid-template-columns: 1fr 1fr; 
+    background: #f8fafc;
+  }
+  section { 
+    border: 1px solid var(--border); 
+    border-radius: 12px; 
+    padding: 1rem; 
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  h2 { margin: 0 0 .5rem; color: #1f2937; }
+  h3 { margin: 1rem 0 .5rem; color: #374151; font-size: 1.1em; }
+  button { 
+    padding: .5rem 1rem; 
+    margin-right: .5rem; 
+    border: none;
+    border-radius: 6px;
+    background: var(--primary);
+    color: white;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  button:hover { opacity: 0.9; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
   .row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
-  .seat { padding: .5rem; border: 1px dashed #aaa; border-radius: 6px; min-width: 14rem; margin:.25rem 0; }
-  .active { outline: 3px solid #0a7; }
-  code.card { display:inline-block; border:1px solid #999; border-radius:4px; padding:.1rem .35rem; margin-right:.25rem; }
-  /* QR modal */
-  dialog { border:none; border-radius:12px; box-shadow:0 20px 60px rgba(0,0,0,.25); }
-  #qrCanvas { display:none; margin: .5rem auto; }
-  #video { width:320px; height:auto; background:#000; }
+  .game-selector { 
+    display: grid; 
+    gap: .5rem; 
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
+  .game-card {
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .game-card:hover {
+    border-color: var(--primary);
+    background: var(--primary-light);
+  }
+  .game-card.selected {
+    border-color: var(--primary);
+    background: var(--primary-light);
+  }
+  .status-badge {
+    display: inline-block;
+    padding: .25rem .5rem;
+    border-radius: 4px;
+    font-size: .875rem;
+    font-weight: 500;
+  }
+  .status-waiting { background: #fef3c7; color: #92400e; }
+  .status-active { background: #d1fae5; color: #065f46; }
+  .players-list { 
+    list-style: none; 
+    padding: 0; 
+    margin: 0;
+  }
+  .players-list li {
+    padding: .5rem;
+    margin: .25rem 0;
+    background: #f9fafb;
+    border-radius: 4px;
+    border-left: 3px solid var(--success);
+  }
+  #gameArea {
+    grid-column: 1 / -1;
+    display: none;
+  }
 </style>
 
 <body>
-<section id="signalingSection">
-  <h2>Room (Host)</h2>
-  <div class="row">
-    <button id="btnCreateRoom">Create Room</button>
-    <div id="roomInfo" style="display: none;">
-      <strong>Room Code: <span id="roomCode"></span></strong>
-      <p>Share this code with players to join your game!</p>
+
+<!-- Game Selection -->
+<section id="gameSelection">
+  <h2>Choose Your Game</h2>
+  <div class="game-selector">
+    <div class="game-card" data-game="poker">
+      <h3>🃏 Poker</h3>
+      <p>Texas Hold'em, chip management, betting rounds</p>
+    </div>
+    <div class="game-card" data-game="blackjack">
+      <h3>🎯 Blackjack</h3>
+      <p>21, dealer vs players, card counting</p>
+    </div>
+    <div class="game-card" data-game="boardgame">
+      <h3>🎲 Board Game</h3>
+      <p>Custom boards, dice, tokens, turn management</p>
+    </div>
+    <div class="game-card" data-game="custom">
+      <h3>⚙️ Custom</h3>
+      <p>Build your own game with basic components</p>
     </div>
   </div>
-  <div id="playersList">
-    <p><em>Players will appear here when they join...</em></p>
-  </div>
 </section>
 
-<section>
-  <h2>Table Controls</h2>
-  <div class="row">
-    <label>Blinds:</label><input id="blinds" value="25/50" />
-    <button id="btnNewHand">New Hand</button>
-    <button id="btnDealFlop">Deal Flop</button>
-    <button id="btnDealTurn">Deal Turn</button>
-    <button id="btnDealRiver">Deal River</button>
+<!-- Room Management -->
+<section id="roomSection">
+  <h2>Game Room</h2>
+  <div id="preRoom">
+    <button id="btnCreateRoom" disabled>Create Room</button>
+    <p class="status-badge status-waiting">Select a game first</p>
   </div>
-  <div class="row">
-    <label>Give Turn to:</label>
-    <select id="selTurn"></select>
-    <button id="btnSetTurn">Set Turn</button>
-  </div>
-</section>
-
-<section>
-  <h2>Table State</h2>
-  <poker-table id="table" level="25/50" hand="0">
-    <seats></seats>
-    <community></community>
-    <pot total="0"></pot>
-  </poker-table>
-  <div id="seatsView"></div>
-  <div id="boardView"></div>
-</section>
-
-<!-- QR Modal -->
-<dialog id="qrDialog">
-  <form method="dialog">
-    <h3 id="qrTitle">QR</h3>
-    <canvas id="qrCanvas" width="320" height="320"></canvas>
-    <video id="video" playsinline></video>
-    <div style="text-align:center;margin-top:.5rem">
-      <button>Close</button>
+  
+  <div id="roomActive" style="display: none;">
+    <div class="row">
+      <span class="status-badge status-active">Room Active</span>
+      <strong>Code: <span id="roomCode"></span></strong>
     </div>
-  </form>
-</dialog>
+    <p>Share this code with players to join your <span id="selectedGameName">game</span>!</p>
+    
+    <h3>Connected Players</h3>
+    <ul id="playersList" class="players-list">
+      <li><em>No players yet...</em></li>
+    </ul>
+  </div>
+</section>
+
+<!-- Dynamic Game Area -->
+<section id="gameArea">
+  <h2>Game Controls</h2>
+  <div id="gameContent">
+    <!-- Game-specific UI will be loaded here -->
+  </div>
+</section>
 
 <script src="/socket.io/socket.io.js"></script>
-
 <script type="module">
-/*** ---------- Pure helpers ---------- ***/
-const suits = ["club","diamond","heart","spade"];
-const ranks = ["2","3","4","5","6","7","8","9","T","J","Q","K","A"];
-const newDeck = () => { const d=[]; for (const s of suits) for (const r of ranks) d.push({r,s});
-  for (let i=d.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [d[i],d[j]]=[d[j],d[i]]; } return d; };
-const deal = (deck, n) => ({ cards: deck.slice(0,n), rest: deck.slice(n) });
-const cardText = ({r,s}) => `${r}${s[0].toUpperCase()}`;
 
-/*** ---------- Custom Element: <poker-table> (functional reducer) ---------- ***/
-customElements.define('poker-table', class extends HTMLElement {
-  connectedCallback(){ this.#renderViews(); }
-  #renderViews(){
-    const seats = [...this.querySelectorAll('seat')];
-    const seatsView = document.getElementById('seatsView'); seatsView.innerHTML='';
-    seats.forEach(seat => {
-      const div = document.createElement('div'); div.className='seat'+(seat.dataset.active==='true'?' active':'');
-      const name = seat.getAttribute('player') ?? '(empty)';
-      div.textContent = `Seat ${seat.getAttribute('pos')}: ${name} | chips=${seat.getAttribute('chips')||'-'} | bet=${seat.getAttribute('bet')||'0'} | folded=${seat.getAttribute('folded')||'false'}`;
-      seatsView.appendChild(div);
-    });
-    const boardView = document.getElementById('boardView'); boardView.innerHTML='';
-    const comm = this.querySelector('community');
-    const stage = (lab, sel) => {
-      const cards = [...comm.querySelectorAll(`card[stage="${sel}"]`)];
-      if (!cards.length) return;
-      const p = document.createElement('p'); p.textContent = `${lab}: `;
-      cards.forEach(c => {
-        const code = document.createElement('code'); code.className='card';
-        code.textContent = cardText({ r:c.getAttribute('rank'), s:c.getAttribute('suit') });
-        p.appendChild(code);
-      });
-      boardView.appendChild(p);
-    };
-    stage('Flop','flop'); stage('Turn','turn'); stage('River','river');
+/*** ---------- Universal Game Host Framework ---------- ***/
+class GameHost {
+  constructor() {
+    this.socket = io();
+    this.currentGame = null;
+    this.gameModule = null;
+    this.roomCode = null;
+    this.players = new Set();
+    this.isHost = false;
+    
+    this.setupEventListeners();
+    this.setupSocketHandlers();
   }
-  reduce(state, action){
-    switch(action.type){
-      case 'NEW_HAND': return { ...state, hand: state.hand+1, pot:0, community:[], seats: state.seats.map(s=>({...s, bet:0, folded:false, active:false, hand:[]})) };
-      case 'SET_TURN': return { ...state, seats: state.seats.map(s=>({...s, active: s.id===action.playerId })) };
-      case 'SET_SEATS': return { ...state, seats: action.seats.slice() };
-      case 'SET_COMMUNITY': return { ...state, community: action.cards.slice() };
-      case 'SET_POT': return { ...state, pot: action.total };
-      default: return state;
+  
+  setupEventListeners() {
+    // Game selection
+    document.querySelectorAll('.game-card').forEach(card => {
+      card.addEventListener('click', () => this.selectGame(card.dataset.game));
+    });
+    
+    // Room creation
+    document.getElementById('btnCreateRoom').addEventListener('click', () => {
+      this.createRoom();
+    });
+  }
+  
+  setupSocketHandlers() {
+    this.socket.on('player-joined', (data) => {
+      console.log('Player joined:', data.playerId);
+      this.players.add(data.playerId);
+      this.updatePlayersList();
+      
+      // Notify game module of new player
+      if (this.gameModule && this.gameModule.onPlayerJoined) {
+        this.gameModule.onPlayerJoined(data);
+      }
+    });
+    
+    this.socket.on('player-left', (data) => {
+      console.log('Player left:', data.playerId);
+      this.players.delete(data.playerId);
+      this.updatePlayersList();
+      
+      if (this.gameModule && this.gameModule.onPlayerLeft) {
+        this.gameModule.onPlayerLeft(data);
+      }
+    });
+    
+    this.socket.on('message', (msg) => {
+      // Forward messages to the game module
+      if (this.gameModule && this.gameModule.onMessage) {
+        this.gameModule.onMessage(msg);
+      }
+    });
+  }
+  
+  async selectGame(gameType) {
+    // Clear previous selection
+    document.querySelectorAll('.game-card').forEach(card => {
+      card.classList.remove('selected');
+    });
+    
+    // Select new game
+    const selectedCard = document.querySelector(`[data-game="${gameType}"]`);
+    selectedCard.classList.add('selected');
+    
+    this.currentGame = gameType;
+    document.getElementById('selectedGameName').textContent = selectedCard.querySelector('h3').textContent;
+    
+    // Enable room creation
+    const createBtn = document.getElementById('btnCreateRoom');
+    createBtn.disabled = false;
+    createBtn.parentElement.querySelector('.status-badge').textContent = 'Ready to create room';
+    createBtn.parentElement.querySelector('.status-badge').className = 'status-badge status-active';
+    
+    // Load game module
+    try {
+      await this.loadGameModule(gameType);
+    } catch (error) {
+      console.error('Failed to load game module:', error);
+      alert(`Failed to load ${gameType} module. Using basic mode.`);
     }
   }
-  write(state){
-    this.setAttribute('hand', String(state.hand));
-    this.querySelector('pot').setAttribute('total', String(state.pot));
-    const seatsRoot = this.querySelector('seats'); seatsRoot.replaceChildren();
-    state.seats.forEach((s,i)=>{
-      const el = document.createElement('seat');
-      el.setAttribute('pos', String(i+1));
-      el.setAttribute('player', s.id);
-      if (s.chips!=null) el.setAttribute('chips', String(s.chips));
-      el.setAttribute('bet', String(s.bet||0));
-      el.setAttribute('folded', String(!!s.folded));
-      el.dataset.active = s.active ? 'true' : 'false';
-      seatsRoot.appendChild(el);
-    });
-    const commRoot = this.querySelector('community'); commRoot.replaceChildren();
-    state.community.forEach((c,i)=>{
-      const el = document.createElement('card');
-      el.setAttribute('stage', i<3 ? 'flop': i===3 ? 'turn' : 'river');
-      el.setAttribute('rank', c.r); el.setAttribute('suit', c.s);
-      commRoot.appendChild(el);
-    });
-    this.#renderViews();
+  
+  async loadGameModule(gameType) {
+    // Dynamic import of game modules
+    const gameModulePath = `./games/${gameType}.js`;
+    
+    try {
+      const module = await import(gameModulePath);
+      this.gameModule = new module.default(this);
+      console.log(`Loaded ${gameType} game module`);
+    } catch (error) {
+      console.warn(`Game module ${gameType} not found, using basic mode`);
+      // Fallback to basic message relay
+      this.gameModule = new BasicGameModule(this);
+    }
   }
-});
-
-/*** ---------- Host state, WebSocket, dispatch ---------- ***/
-const socket = io();
-const connectedPlayers = new Set(); // Track connected player IDs
-const tableEl = document.getElementById('table');
-const initialTableState = () => ({ hand: Number(tableEl.getAttribute('hand'))||0, pot: 0, community: [], seats: [] });
-let tableState = initialTableState();
-let isHost = false;
-let roomCode = null;
-
-function tableDispatch(action){
-  const next = tableEl.reduce(tableState, action);
-  tableState = next;
-  tableEl.write(tableState);
-  broadcast({ type:'TABLE', state: publicTableSnapshot() });
-}
-function publicTableSnapshot(){
-  return {
-    hand: tableState.hand,
-    pot: tableState.pot,
-    community: tableState.community,
-    seats: tableState.seats.map(s=>({ id:s.id, chips:s.chips, bet:s.bet, folded:s.folded, active:s.active }))
-  };
-}
-function broadcast(msg){ 
-  if (isHost && socket.connected) {
-    socket.emit('relay-message', msg);
+  
+  createRoom() {
+    if (!this.currentGame) {
+      alert('Please select a game first');
+      return;
+    }
+    
+    this.socket.emit('create-room', (response) => {
+      if (response.success) {
+        this.roomCode = response.roomCode;
+        this.isHost = true;
+        
+        // Update UI
+        document.getElementById('roomCode').textContent = this.roomCode;
+        document.getElementById('preRoom').style.display = 'none';
+        document.getElementById('roomActive').style.display = 'block';
+        document.getElementById('gameArea').style.display = 'block';
+        
+        // Initialize game module
+        if (this.gameModule && this.gameModule.onRoomCreated) {
+          this.gameModule.onRoomCreated(this.roomCode);
+        }
+        
+        console.log('Room created:', this.roomCode);
+      } else {
+        console.error('Failed to create room:', response.error);
+        alert('Failed to create room: ' + response.error);
+      }
+    });
   }
-}
-function sendTo(playerId, msg){ 
-  // In WebSocket version, we just broadcast since server handles routing
-  broadcast(msg);
-}
-
-/*** ---------- WebSocket Room Management ---------- ***/
-const btnCreateRoom = document.getElementById('btnCreateRoom');
-const roomInfo = document.getElementById('roomInfo');
-const roomCodeSpan = document.getElementById('roomCode');
-const playersList = document.getElementById('playersList');
-
-let deck = newDeck();
-
-btnCreateRoom.onclick = async () => {
-  socket.emit('create-room', (response) => {
-    if (response.success) {
-      roomCode = response.roomCode;
-      isHost = true;
-      roomCodeSpan.textContent = roomCode;
-      roomInfo.style.display = 'block';
-      btnCreateRoom.style.display = 'none';
-      console.log('Room created:', roomCode);
+  
+  updatePlayersList() {
+    const list = document.getElementById('playersList');
+    list.innerHTML = '';
+    
+    if (this.players.size === 0) {
+      const li = document.createElement('li');
+      li.innerHTML = '<em>No players yet...</em>';
+      list.appendChild(li);
     } else {
-      console.error('Failed to create room:', response.error);
-    }
-  });
-};
-
-/*** ---------- WebSocket Event Handlers ---------- ***/
-socket.on('player-joined', (data) => {
-  const { playerId, chips } = data;
-  console.log('Player joined:', playerId, 'with chips:', chips);
-  connectedPlayers.add(playerId);
-  
-  const seats = tableState.seats.some(s=>s.id===playerId)
-    ? tableState.seats
-    : tableState.seats.concat([{ id:playerId, chips: chips ?? 1500, bet:0, folded:false, active:false, hand:[] }]);
-  tableDispatch({ type:'SET_SEATS', seats });
-  
-  // Send welcome message to new player
-  socket.emit('relay-message', { 
-    type:'ACCEPT', 
-    ruleset_version: 'poker-min@0.1.0',
-    targetPlayer: playerId 
-  });
-  
-  // Send current table state
-  socket.emit('relay-message', { 
-    type:'TABLE', 
-    state: publicTableSnapshot(),
-    targetPlayer: playerId 
-  });
-  
-  console.log('Refreshing turn select with seats:', seats.map(s => s.id));
-  refreshTurnSelect();
-  updatePlayersList();
-});
-
-socket.on('player-left', (data) => {
-  const { playerId } = data;
-  console.log('Player left:', playerId);
-  connectedPlayers.delete(playerId);
-  // Remove from seats
-  const seats = tableState.seats.filter(s => s.id !== playerId);
-  tableDispatch({ type:'SET_SEATS', seats });
-  refreshTurnSelect();
-  updatePlayersList();
-});
-
-socket.on('message', (msg) => {
-  if (msg.type === 'INTENT'){
-    const pid = msg.player;
-    const seat = tableState.seats.find(s=>s.id===pid); if (!seat) return;
-    if (msg.action === 'FOLD'){
-      seat.folded = true; seat.active = false; tableDispatch({ type:'SET_SEATS', seats: tableState.seats });
-    }
-    if (msg.action === 'CALL'){
-      const toCall = Math.max(...tableState.seats.map(s=>s.bet||0)) - (seat.bet||0);
-      const pay = Math.min(seat.chips||0, toCall);
-      seat.chips -= pay; seat.bet += pay; tableState.pot += pay;
-      tableDispatch({ type:'SET_SEATS', seats: tableState.seats }); tableDispatch({ type:'SET_POT', total: tableState.pot });
-    }
-    if (msg.action === 'RAISE'){
-      const minRaise = 50;
-      const raiseTo = Math.max(...tableState.seats.map(s=>s.bet||0)) + (msg.amount||minRaise);
-      const need = raiseTo - (seat.bet||0);
-      const pay = Math.min(seat.chips||0, need);
-      seat.chips -= pay; seat.bet += pay; tableState.pot += pay;
-      tableDispatch({ type:'SET_SEATS', seats: tableState.seats }); tableDispatch({ type:'SET_POT', total: tableState.pot });
+      for (const playerId of this.players) {
+        const li = document.createElement('li');
+        li.textContent = playerId;
+        list.appendChild(li);
+      }
     }
   }
-});
-
-/*** ---------- Dealer controls ---------- ***/
-document.getElementById('btnNewHand').onclick = () => {
-  deck = newDeck();
-  tableDispatch({ type:'NEW_HAND' });
-  for (const pid of connectedPlayers){
-    const seat = tableState.seats.find(s=>s.id===pid); if (!seat) continue;
-    const { cards, rest } = deal(deck, 2); deck = rest;
-    socket.emit('relay-message', { type:'HOLE', cards, targetPlayer: pid });
+  
+  // API for game modules
+  broadcast(message) {
+    if (this.isHost && this.socket.connected) {
+      this.socket.emit('relay-message', message);
+    }
   }
-  document.getElementById('boardView').innerHTML='';
-};
-document.getElementById('btnDealFlop').onclick = () => {
-  const { cards, rest } = deal(deck, 3); deck = rest;
-  tableDispatch({ type:'SET_COMMUNITY', cards });
-};
-document.getElementById('btnDealTurn').onclick = () => {
-  const prev = tableState.community;
-  const { cards, rest } = deal(deck, 1); deck = rest;
-  tableDispatch({ type:'SET_COMMUNITY', cards: prev.concat(cards) });
-};
-document.getElementById('btnDealRiver').onclick = () => {
-  const prev = tableState.community;
-  const { cards, rest } = deal(deck, 1); deck = rest;
-  tableDispatch({ type:'SET_COMMUNITY', cards: prev.concat(cards) });
-};
-const selTurn = document.getElementById('selTurn');
-function refreshTurnSelect(){ 
-  console.log('refreshTurnSelect called with tableState.seats:', tableState.seats);
-  selTurn.replaceChildren(); 
-  tableState.seats.forEach(s=>{ 
-    console.log('Adding option for seat:', s.id);
-    const o=document.createElement('option'); 
-    o.value=s.id; 
-    o.textContent=s.id; 
-    selTurn.appendChild(o); 
-  }); 
-}
-document.getElementById('btnSetTurn').onclick = () => { const pid = selTurn.value; tableDispatch({ type:'SET_TURN', playerId: pid }); broadcast({ type:'TURN', player: pid }); };
-document.getElementById('blinds').onchange = (e) => { tableEl.setAttribute('level', e.target.value); };
-
-function updatePlayersList() {
-  playersList.innerHTML = '';
-  for (const playerId of connectedPlayers) {
-    const li = document.createElement('li');
-    li.textContent = playerId;
-    playersList.appendChild(li);
+  
+  sendToPlayer(playerId, message) {
+    if (this.isHost && this.socket.connected) {
+      this.socket.emit('relay-message', { ...message, targetPlayer: playerId });
+    }
+  }
+  
+  setGameUI(htmlContent) {
+    document.getElementById('gameContent').innerHTML = htmlContent;
   }
 }
 
-
-
-
-/*** ---------- Debug mode ---------- ***/
-// Show debug-only elements if ?debug parameter is present
-if (new URLSearchParams(window.location.search).has('debug')) {
-  document.querySelectorAll('.debug-only').forEach(element => {
-    if (element.tagName === 'BUTTON') {
-      element.style.display = 'inline-block';
-    } else {
-      element.style.display = 'block';
-    }
-  });
+// Basic fallback game module
+class BasicGameModule {
+  constructor(host) {
+    this.host = host;
+  }
+  
+  onRoomCreated(roomCode) {
+    this.host.setGameUI(`
+      <h3>Basic Game Mode</h3>
+      <p>Room ${roomCode} is active. Game-specific modules will provide richer functionality.</p>
+      <button onclick="this.parentElement.host.broadcast({type: 'ping', message: 'Hello players!'})">
+        Send Test Message
+      </button>
+    `);
+  }
+  
+  onPlayerJoined(data) {
+    console.log('Basic module: player joined', data.playerId);
+  }
+  
+  onPlayerLeft(data) {
+    console.log('Basic module: player left', data.playerId);
+  }
+  
+  onMessage(msg) {
+    console.log('Basic module: received message', msg);
+  }
 }
+
+// Initialize the host
+window.gameHost = new GameHost();
+
 </script>
 </body>
 </html>
