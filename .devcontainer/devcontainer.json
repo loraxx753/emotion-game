@@ -1,5 +1,5 @@
 {
-  "name": "Poker Party Server",
+  "name": "Game Night Server",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
   "features": {
     "ghcr.io/devcontainers/features/github-cli:1": {}
@@ -8,7 +8,7 @@
   "forwardPorts": [3000],
   "portsAttributes": {
     "3000": {
-      "label": "Poker Server",
+      "label": "Game Night Server",
       "onAutoForward": "notify"
     }
   },

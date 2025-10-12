@@ -1,7 +1,7 @@
 {
-  "name": "poker-party",
+  "name": "game-night",
   "version": "2.0.0",
-  "description": "Real-time multiplayer Texas Hold'em poker game with Socket.IO",
+  "description": "Universal multiplayer game platform with Socket.IO - poker, dice, cards and more",
   "type": "module",
   "main": "server.mjs",
   "scripts": {
@@ -17,23 +17,25 @@
     "node": ">=20.0.0"
   },
   "keywords": [
-    "poker",
+    "game-night",
     "multiplayer",
     "websocket",
     "socket.io",
-    "texas-holdem",
-    "card-game",
+    "poker",
+    "card-games",
+    "dice-games",
+    "board-games",
     "real-time",
     "node.js"
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/YOUR-USERNAME/poker-party.git"
+    "url": "git+https://github.com/YOUR-USERNAME/game-night.git"
   },
   "license": "MIT",
   "author": "Your Name",
-  "homepage": "https://github.com/YOUR-USERNAME/poker-party#readme",
+  "homepage": "https://github.com/YOUR-USERNAME/game-night#readme",
   "bugs": {
-    "url": "https://github.com/YOUR-USERNAME/poker-party/issues"
+    "url": "https://github.com/YOUR-USERNAME/game-night/issues"
   }
 }

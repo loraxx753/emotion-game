@@ -1,4 +1,4 @@
-# 🚀 Deploying Poker Party to GitHub Codespaces
+# 🚀 Deploying Game Night to GitHub Codespaces
 
 ## Quick Start (2 minutes)
 
@@ -7,8 +7,8 @@
 # If not already done, initialize git and push to GitHub
 git init
 git add .
-git commit -m "Initial poker party implementation"
-git remote add origin https://github.com/YOUR-USERNAME/poker-party.git
+git commit -m "Initial game night platform implementation"
+git remote add origin https://github.com/YOUR-USERNAME/game-night.git
 git push -u origin main
 ```
 
@@ -39,13 +39,13 @@ npm start
 
 ### Public URL Format
 ```
-https://USERNAME-REPONAME-RANDOMID.github.dev/
+https://USERNAME-game-night-RANDOMID.github.dev/
 ```
 
 ### Share with Friends
 1. Copy the Codespace URL from your browser
 2. Send to friends via text/email/Discord
-3. They can join as players directly!
+3. They can join games directly!
 
 ## 🔧 Advanced Configuration
 
@@ -82,7 +82,7 @@ pm2 start server.mjs --name poker-server
 1. Share your Codespace URL
 2. Host creates room, gets 6-digit code
 3. Friends visit same URL, enter room code
-4. Play poker in real-time!
+4. Play games in real-time!
 
 ## 🛠 Troubleshooting
 
@@ -167,4 +167,4 @@ Consider moving to dedicated hosting for:
 
 ---
 
-**🎉 That's it! Your poker game is now live and accessible to friends worldwide via GitHub Codespaces!**
+**🎉 That's it! Your game night platform is now live and accessible to friends worldwide via GitHub Codespaces!**

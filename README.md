@@ -1,10 +1,10 @@
-# 🃏 Poker Party
+# � Game Night
 
-> **Real-time multiplayer poker game that brings the casino to your living room**
+> **Universal multiplayer game platform that brings friends together**
 
-A modern, server-based poker game built with Node.js and Socket.IO. Play Texas Hold'em with friends using just a web browser - no downloads, no accounts, just pure poker fun!
+A modern, server-based game platform built with Node.js and Socket.IO. Play poker, dice games, card games and more with friends using just a web browser - no downloads, no accounts, just pure gaming fun!
 
-![Poker Party Demo](https://img.shields.io/badge/Status-Live%20Demo-brightgreen) ![Node.js](https://img.shields.io/badge/Node.js-18+-green) ![Socket.IO](https://img.shields.io/badge/Socket.IO-4.7-blue)
+![Game Night Demo](https://img.shields.io/badge/Status-Live%20Demo-brightgreen) ![Node.js](https://img.shields.io/badge/Node.js-22+-green) ![Socket.IO](https://img.shields.io/badge/Socket.IO-4.7-blue)
 
 ## ✨ Features
 
@@ -38,8 +38,8 @@ A modern, server-based poker game built with Node.js and Socket.IO. Play Texas H
 
 ### Local Development
 ```bash
-git clone https://github.com/YOUR-USERNAME/poker-party.git
-cd poker-party
+git clone https://github.com/YOUR-USERNAME/game-night.git
+cd game-night
 npm install
 npm start
 ```
@@ -114,14 +114,14 @@ class PokerGameModule {
 
 ### Project Structure
 ```
-poker-party/
+game-night/
 ├── server.mjs              # WebSocket server + file serving
 ├── index.html              # Modern landing page
-├── host.html               # Dealer interface with game controls
-├── player.html             # Player interface with betting actions
+├── host.html               # Host interface with game controls
+├── player.html             # Player interface with game actions
 ├── package.json            # Dependencies (socket.io)
 ├── .devcontainer/          # GitHub Codespaces config
-│   └── devcontainer.json   # Node.js 18, auto port forwarding
+│   └── devcontainer.json   # Node.js 22, auto port forwarding
 └── README.md               # This file
 ```
 
@@ -132,7 +132,7 @@ poker-party/
     "socket.io": "^4.7.0"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   }
 }
 ```
@@ -154,10 +154,10 @@ git push origin main
 5. Share the public URL!
 
 ### Step 3: Play with Friends
-- Codespace gives you a public URL like: `https://username-poker-party-abc123.github.dev`
+- Codespace gives you a public URL like: `https://username-game-night-abc123.github.dev`
 - Share this URL with friends
 - Host creates room, friends join with room code
-- Play real-time poker!
+- Play real-time games!
 
 **👉 See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions**
 
@@ -181,4 +181,4 @@ MIT License - Use this for your own poker nights!
 
 ---
 
-**🎉 Ready to deal? Deploy to Codespaces and start your poker party!**
+**🎉 Ready to play? Deploy to Codespaces and start your game night!**
