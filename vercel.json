@@ -1,0 +1,26 @@
+{
+  "version": 2,
+  "name": "game-night",
+  "buildCommand": "npm install",
+  "devCommand": "npm start",
+  "installCommand": "npm install",
+  "builds": [
+    {
+      "src": "server.mjs", 
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/socket.io/(.*)",
+      "dest": "/server.mjs"
+    },
+    {
+      "src": "/(.*)", 
+      "dest": "/server.mjs"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
+}

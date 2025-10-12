@@ -155,7 +155,8 @@ git push origin main
 
 ### Step 3: Play with Friends
 - Codespace gives you a public URL like: `https://username-game-night-abc123.github.dev`
-- Share this URL with friends
+- **For production**: Deploy to custom domain like `https://game-night.online`
+- Share URL with friends
 - Host creates room, friends join with room code
 - Play real-time games!
 

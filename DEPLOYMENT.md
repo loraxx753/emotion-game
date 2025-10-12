@@ -1,6 +1,14 @@
-# 🚀 Deploying Game Night to GitHub Codespaces
+# 🚀 Deploying Game Night 
 
-## Quick Start (2 minutes)
+## Deployment Options
+
+### 🎯 Quick Development (GitHub Codespaces)
+Perfect for testing and development with friends.
+
+### 🌐 Production with Custom Domain (Vercel)
+Best for permanent hosting with your own URL.
+
+## GitHub Codespaces Deployment (2 minutes)
 
 ### Step 1: Push to GitHub
 ```bash
@@ -20,7 +28,7 @@ git push -u origin main
 
 ### Step 3: Auto-Setup
 - Codespace will automatically:
-  - Install Node.js 18
+  - Install Node.js 22
   - Run `npm install` 
   - Forward port 3000
   - Notify when server is ready
@@ -167,4 +175,163 @@ Consider moving to dedicated hosting for:
 
 ---
 
-**🎉 That's it! Your game night platform is now live and accessible to friends worldwide via GitHub Codespaces!**
+---
+
+## 🌐 Custom Domain Deployment
+
+### Why Custom Domain?
+- **Professional URL**: `https://game-night.online` instead of long Codespace URLs
+- **Always Available**: 24/7 hosting, doesn't sleep
+- **Better Performance**: Global CDN, faster loading
+- **Easy Sharing**: Memorable URLs for friends
+
+### Option A: Render (Easiest - No CLI)
+
+#### 1. Deploy to Render (Free)
+1. Go to **render.com**
+2. Click **"New Web Service"**
+3. Connect your GitHub account
+4. Select your `game-night` repository
+5. Use these settings:
+   ```
+   Name: game-night
+   Environment: Node
+   Build Command: npm install
+   Start Command: npm start
+   ```
+6. Click **"Create Web Service"**
+
+#### 2. Add Custom Domain (render.com)
+1. Go to your service dashboard
+2. Click **"Settings" → "Custom Domains"**
+3. Add `game-night.online`
+4. Follow their DNS instructions
+
+### Option B: Vercel (Requires CLI)
+
+#### 1. Deploy to Vercel (Free)
+```bash
+# Install Vercel CLI (one-time setup)
+npm install -g vercel
+
+# Deploy your game
+vercel
+
+# Follow prompts:
+# - Link to existing project? No
+# - Project name: game-night
+# - Deploy? Yes
+```
+
+#### 2. Get Custom Domain
+Popular options:
+- **Namecheap**: $8-12/year for `.com`
+- **Google Domains**: $12/year for `.com`  
+- **Cloudflare**: $8/year for `.com`
+
+Perfect gaming domain example:
+- `game-night.online` ⭐ **Recommended!**
+
+Other fun options:
+- `gamenight.fun`
+- `playnight.app`  
+- `cardnight.co`
+
+#### 3. Connect Custom Domain
+```bash
+# Add domain to Vercel project
+vercel domains add game-night.online
+```
+
+Vercel will provide DNS records. Add these to your domain registrar:
+
+**DNS Records to Add:**
+```
+Type: CNAME
+Name: @
+Value: cname.vercel-dns.com
+
+Type: CNAME  
+Name: www
+Value: cname.vercel-dns.com
+```
+
+#### 4. Configure DNS at Your Registrar
+
+**Namecheap:**
+1. Go to Domain List → Manage → Advanced DNS
+2. Delete existing A/CNAME records for @ and www
+3. Add new CNAME records:
+   - Host: `@`, Value: `cname.vercel-dns.com`
+   - Host: `www`, Value: `cname.vercel-dns.com`
+
+**GoDaddy:**
+1. Go to My Products → Domain → DNS Management
+2. Edit/Add CNAME records:
+   - Name: `@`, Value: `cname.vercel-dns.com`
+   - Name: `www`, Value: `cname.vercel-dns.com`
+
+**Cloudflare:**
+1. Go to DNS → Records
+2. Add CNAME records:
+   - Name: `game-night.online`, Value: `cname.vercel-dns.com`
+   - Name: `www`, Value: `cname.vercel-dns.com`
+
+**Google Domains:**
+1. Go to DNS → Custom records
+2. Add CNAME records:
+   - Host name: `@`, Data: `cname.vercel-dns.com`
+   - Host name: `www`, Data: `cname.vercel-dns.com`
+
+#### 5. Wait for DNS Propagation
+- DNS changes take 5-60 minutes to propagate
+- Check status: `nslookup game-night.online`
+- Vercel will show "Domain Active" when ready
+
+#### 6. Automatic Deployments  
+- Every `git push` automatically deploys
+- Instant updates for your friends
+- Built-in SSL certificates (https://)
+
+### Example with game-night.online
+```
+Production:  https://game-night.online
+Staging:     https://dev-game-night.vercel.app
+```
+
+### Comparison: Codespaces vs Hosting Platforms
+
+| Feature | Codespaces | Render/Vercel |
+|---------|------------|---------------|
+| **Custom Domain** | ❌ Auto-generated | ✅ Your domain |
+| **Always Online** | ❌ Sleeps after 30min | ✅ 24/7 hosting |
+| **Setup Time** | 2 minutes | 5-10 minutes |
+| **Cost** | Free (120 hours/month) | Free tier available |
+| **Best For** | Development & testing | Production sharing |
+| **CLI Required** | ❌ Browser only | Render: ❌ / Vercel: ✅ |
+
+### 🔧 DNS Troubleshooting
+
+#### Common Issues:
+- **"Domain not found"**: DNS not propagated yet (wait 30-60 mins)
+- **"SSL certificate pending"**: Vercel is generating certificate (wait 5-10 mins)  
+- **"Invalid DNS"**: Double-check CNAME values exactly match Vercel's
+
+#### Verify DNS Setup:
+```bash
+# Check if DNS is working
+nslookup game-night.online
+
+# Should return something like:
+# game-night.online  CNAME  cname.vercel-dns.com
+```
+
+#### Test Your Setup:
+```bash
+# Check if domain resolves to Vercel
+curl -I https://game-night.online
+
+# Should return 200 OK with Vercel headers
+```
+
+**🎉 Now your friends can play at https://game-night.online!**
