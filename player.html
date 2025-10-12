@@ -3,14 +3,125 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Game Player</title>
 <style>
-body { font-family: system-ui; margin: 2rem; background: #f8fafc; }
+body { font-family: system-ui; margin: 1rem; background: #f8fafc; }
 section { background: white; padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
 input, button { padding: 0.5rem; margin: 0.25rem; border: 1px solid #ccc; border-radius: 4px; }
-button { background: #2563eb; color: white; border: none; cursor: pointer; }
+button { background: #2563eb; color: white; border: none; cursor: pointer; font-weight: 500; }
 button:hover { opacity: 0.9; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
 .status { padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.875rem; }
 .status-waiting { background: #fef3c7; color: #92400e; }
 .status-connected { background: #d1fae5; color: #065f46; }
+
+/* Poker-specific styles */
+.player-info { 
+  background: #1e293b; 
+  color: white; 
+  padding: 1rem; 
+  border-radius: 8px; 
+  margin-bottom: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.player-name { font-size: 1.2rem; font-weight: bold; }
+.player-stats { display: flex; gap: 1rem; }
+.stat { text-align: center; }
+.stat-value { font-size: 1.1rem; font-weight: bold; color: #22d3ee; }
+.stat-label { font-size: 0.8rem; opacity: 0.8; }
+
+.hand-area { margin: 1rem 0; }
+.cards { display: flex; gap: 0.5rem; justify-content: center; margin: 1rem 0; }
+.card { 
+  background: white; 
+  border: 2px solid #374151; 
+  border-radius: 8px; 
+  padding: 0.5rem 1rem; 
+  font-weight: bold; 
+  font-size: 1.1rem;
+  min-width: 60px;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.card.red { color: #dc2626; }
+.card.black { color: #1f2937; }
+
+.actions { 
+  display: flex; 
+  gap: 0.5rem; 
+  justify-content: center; 
+  flex-wrap: wrap;
+  margin: 1rem 0;
+}
+.action-btn { 
+  padding: 0.75rem 1.5rem; 
+  font-size: 1rem; 
+  border-radius: 6px;
+  min-width: 100px;
+}
+.action-btn.fold { background: #dc2626; }
+.action-btn.call { background: #059669; }
+.action-btn.raise { background: #d97706; }
+
+.community-area { text-align: center; margin: 1rem 0; }
+.pot-display { 
+  background: #0f172a; 
+  color: #22d3ee; 
+  padding: 0.5rem 1rem; 
+  border-radius: 6px; 
+  font-weight: bold;
+  display: inline-block;
+  margin: 0.5rem 0;
+}
+
+.turn-indicator { 
+  background: #059669; 
+  color: white; 
+  padding: 0.5rem 1rem; 
+  border-radius: 6px; 
+  text-align: center;
+  font-weight: bold;
+  display: none;
+}
+.turn-indicator.active { display: block; animation: pulse 1s infinite; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.raise-controls { 
+  display: none; 
+  background: #f3f4f6; 
+  padding: 1rem; 
+  border-radius: 8px; 
+  margin: 0.5rem 0;
+}
+.raise-controls.show { display: block; }
+.raise-slider { width: 100%; margin: 0.5rem 0; }
+
+/* Winner celebration styles */
+.winner-celebration {
+  animation: winnerPulse 2s ease-in-out infinite;
+  border: 3px solid #16a34a !important;
+  background: linear-gradient(135deg, #dcfce7, #bbf7d0) !important;
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.5) !important;
+}
+
+@keyframes winnerPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 20px rgba(34, 197, 94, 0.5); }
+  50% { transform: scale(1.02); box-shadow: 0 0 30px rgba(34, 197, 94, 0.8); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.loser-fade {
+  opacity: 0.6;
+  border-color: #d1d5db !important;
+}
 </style>
 
 <body>
@@ -25,14 +136,87 @@ button:hover { opacity: 0.9; }
 </section>
 
 <section id="gameArea" style="display:none">
-  <h2>Game Interface</h2>
-  <div id="gameContent">Connecting...</div>
+  <!-- Player Info -->
+  <div class="player-info">
+    <div class="player-name" id="playerDisplayName">Player-1</div>
+    <div class="player-stats">
+      <div class="stat">
+        <div class="stat-value" id="chipCount">1500</div>
+        <div class="stat-label">Chips</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="currentBet">0</div>
+        <div class="stat-label">Bet</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Turn Indicator -->
+  <div class="turn-indicator" id="turnIndicator">
+    🎯 Your Turn!
+  </div>
+
+  <!-- Hand Cards -->
+  <div class="hand-area">
+    <h3>Your Cards</h3>
+    <div class="cards" id="playerHand">
+      <div style="color: #6b7280; font-style: italic;">Waiting for cards...</div>
+    </div>
+  </div>
+
+  <!-- Community Cards -->
+  <div class="community-area">
+    <h3>Community Cards</h3>
+    <div class="pot-display" id="potDisplay">Pot: $0</div>
+    <div class="cards" id="communityCards">
+      <div style="color: #6b7280; font-style: italic;">No community cards yet</div>
+    </div>
+  </div>
+
+  <!-- Player Actions -->
+  <div class="actions" id="actionButtons">
+    <button class="action-btn fold" id="foldBtn" disabled onclick="playerAction('fold')">
+      ✋ Fold
+    </button>
+    <button class="action-btn call" id="callBtn" disabled onclick="playerAction('call')">
+      📞 Call $<span id="callAmount">0</span>
+    </button>
+    <button class="action-btn raise" id="raiseBtn" disabled onclick="showRaiseControls()">
+      📈 Raise
+    </button>
+  </div>
+
+  <!-- Raise Controls -->
+  <div class="raise-controls" id="raiseControls">
+    <h4>Raise Amount</h4>
+    <input type="range" class="raise-slider" id="raiseSlider" min="50" max="500" value="100">
+    <div style="display: flex; gap: 0.5rem; align-items: center; justify-content: center;">
+      <input type="number" id="raiseAmount" value="100" min="50" style="width: 80px;">
+      <button onclick="playerAction('raise')" class="action-btn raise">
+        Raise $<span id="raiseDisplay">100</span>
+      </button>
+      <button onclick="hideRaiseControls()" style="background: #6b7280;">
+        Cancel
+      </button>
+    </div>
+  </div>
+
+  <!-- Game Messages -->
+  <div id="gameMessages" style="max-height: 200px; overflow-y: auto; background: #f9fafb; padding: 1rem; border-radius: 8px; margin-top: 1rem;">
+    <div style="color: #6b7280; font-style: italic;">Game messages will appear here...</div>
+  </div>
 </section>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket = io();
 let connected = false;
+let playerName = '';
+let playerChips = 1500;
+let currentBet = 0;
+let isMyTurn = false;
+let isFolded = false;
+let hand = [];
 
 function joinRoom() {
   const name = document.getElementById('playerName').value.trim();
@@ -43,6 +227,7 @@ function joinRoom() {
     return;
   }
   
+  playerName = name;
   document.getElementById('status').textContent = 'Connecting...';
   
   socket.emit('join-room', { roomCode: code, playerId: name, chips: 1500 }, (response) => {
@@ -51,17 +236,360 @@ function joinRoom() {
       document.getElementById('status').textContent = 'Connected';
       document.getElementById('status').className = 'status status-connected';
       document.getElementById('gameArea').style.display = 'block';
-      document.getElementById('gameContent').innerHTML = '<p> Connected to ' + code + ' as ' + name + '</p>';
+      document.getElementById('playerDisplayName').textContent = name;
+      
+      // Send hello message to host
+      socket.emit('send-message', {
+        type: 'HELLO',
+        player_id: name,
+        chips: 1500
+      });
+      
+      addGameMessage('✅ Connected to game as ' + name);
     } else {
       document.getElementById('status').textContent = 'Failed: ' + response.error;
     }
   });
 }
 
+// Socket message handlers
 socket.on('message', (msg) => {
-  const content = document.getElementById('gameContent');
-  content.innerHTML += '<div style="margin:0.5rem 0; padding:0.5rem; background:#f3f4f6; border-radius:4px;">' + JSON.stringify(msg) + '</div>';
+  console.log('Received:', msg);
+  
+  switch (msg.type) {
+    case 'ACCEPT':
+      addGameMessage('🎮 Joined poker game successfully!');
+      break;
+      
+    case 'HOLE':
+      receiveHoleCards(msg.cards);
+      break;
+      
+    case 'TABLE':
+      updateTableState(msg.state);
+      break;
+      
+    case 'TURN':
+      updateTurnState(msg.player);
+      break;
+      
+    case 'SHOWDOWN':
+      handleShowdown(msg);
+      break;
+      
+    default:
+      addGameMessage('📨 ' + JSON.stringify(msg));
+  }
 });
+
+socket.on('disconnect', () => {
+  connected = false;
+  addGameMessage('❌ Disconnected from server');
+});
+
+// Game state handlers
+function receiveHoleCards(cards) {
+  hand = cards;
+  updateHandDisplay();
+  addGameMessage('🃏 You received your hole cards');
+}
+
+function updateHandDisplay() {
+  const handEl = document.getElementById('playerHand');
+  if (hand.length === 0) {
+    handEl.innerHTML = '<div style="color: #6b7280; font-style: italic;">No cards</div>';
+  } else {
+    handEl.innerHTML = hand.map(card => 
+      `<div class="card ${getCardColor(card.s)}">${card.r}${card.s}</div>`
+    ).join('');
+  }
+}
+
+function updateTableState(tableState) {
+  // Update pot
+  document.getElementById('potDisplay').textContent = `Pot: $${tableState.pot}`;
+  
+  // Update community cards
+  const communityEl = document.getElementById('communityCards');
+  if (tableState.community.length === 0) {
+    communityEl.innerHTML = '<div style="color: #6b7280; font-style: italic;">No community cards yet</div>';
+  } else {
+    communityEl.innerHTML = tableState.community.map(card => 
+      `<div class="card ${getCardColor(card.s)}">${card.r}${card.s}</div>`
+    ).join('');
+  }
+  
+  // Update my status
+  const mySeat = tableState.seats.find(s => s.id === playerName);
+  if (mySeat) {
+    playerChips = mySeat.chips;
+    currentBet = mySeat.bet;
+    isFolded = mySeat.folded;
+    isMyTurn = mySeat.active;
+    
+    document.getElementById('chipCount').textContent = playerChips;
+    document.getElementById('currentBet').textContent = currentBet;
+    
+    updateActionButtons(tableState);
+  }
+}
+
+function updateTurnState(currentPlayer) {
+  isMyTurn = (currentPlayer === playerName);
+  const turnEl = document.getElementById('turnIndicator');
+  
+  if (isMyTurn) {
+    turnEl.classList.add('active');
+    addGameMessage('👆 It\'s your turn!');
+  } else {
+    turnEl.classList.remove('active');
+    addGameMessage(`⏳ ${currentPlayer}'s turn`);
+  }
+  
+  updateActionButtons();
+}
+
+function updateActionButtons(tableState = null) {
+  const canAct = isMyTurn && !isFolded && connected;
+  
+  document.getElementById('foldBtn').disabled = !canAct;
+  document.getElementById('callBtn').disabled = !canAct;
+  document.getElementById('raiseBtn').disabled = !canAct;
+  
+  if (tableState) {
+    // Calculate call amount
+    const maxBet = Math.max(...tableState.seats.map(s => s.bet || 0));
+    const callAmount = Math.max(0, maxBet - currentBet);
+    
+    document.getElementById('callAmount').textContent = callAmount;
+    
+    // Update call button text
+    const callBtn = document.getElementById('callBtn');
+    if (callAmount === 0) {
+      callBtn.innerHTML = '✅ Check';
+    } else {
+      callBtn.innerHTML = `📞 Call $${callAmount}`;
+    }
+  }
+}
+
+// Player actions
+function playerAction(action) {
+  if (!connected || !isMyTurn || isFolded) return;
+  
+  let message = {
+    type: 'INTENT',
+    player: playerName,
+    action: action.toUpperCase()
+  };
+  
+  if (action === 'raise') {
+    const amount = parseInt(document.getElementById('raiseAmount').value);
+    message.amount = amount;
+    addGameMessage(`📈 You raised $${amount}`);
+    hideRaiseControls();
+  } else if (action === 'call') {
+    addGameMessage('📞 You called');
+  } else if (action === 'fold') {
+    addGameMessage('✋ You folded');
+    isFolded = true;
+  }
+  
+  socket.emit('send-message', message);
+}
+
+// Raise controls
+function showRaiseControls() {
+  document.getElementById('raiseControls').classList.add('show');
+  
+  // Set reasonable limits
+  const minRaise = 50;
+  const maxRaise = Math.min(playerChips, 500);
+  
+  const slider = document.getElementById('raiseSlider');
+  const input = document.getElementById('raiseAmount');
+  
+  slider.min = minRaise;
+  slider.max = maxRaise;
+  slider.value = Math.min(100, maxRaise);
+  
+  input.min = minRaise;
+  input.max = maxRaise;
+  input.value = slider.value;
+  
+  document.getElementById('raiseDisplay').textContent = slider.value;
+}
+
+function hideRaiseControls() {
+  document.getElementById('raiseControls').classList.remove('show');
+}
+
+// Sync raise slider and input
+document.getElementById('raiseSlider').addEventListener('input', (e) => {
+  document.getElementById('raiseAmount').value = e.target.value;
+  document.getElementById('raiseDisplay').textContent = e.target.value;
+});
+
+document.getElementById('raiseAmount').addEventListener('input', (e) => {
+  document.getElementById('raiseSlider').value = e.target.value;
+  document.getElementById('raiseDisplay').textContent = e.target.value;
+});
+
+// Utility functions
+function getCardColor(suit) {
+  return ['♥', '♦'].includes(suit) ? 'red' : 'black';
+}
+
+function handleShowdown(showdownData) {
+  console.log('Showdown results:', showdownData);
+  
+  // Check if I won
+  const didIWin = showdownData.winners.includes(playerName);
+  const myResult = showdownData.results.find(r => r.playerId === playerName);
+  
+  // Create prominent winner announcement
+  if (didIWin) {
+    // Show big winner message
+    addWinnerMessage(`� CONGRATULATIONS! YOU WON! 🎉`, `${myResult.handName} - Won $${showdownData.potShare}`, true);
+    
+    // Update my chip count
+    playerChips += showdownData.potShare;
+    document.getElementById('chipCount').textContent = playerChips;
+  } else {
+    // Show who actually won
+    const winnerNames = showdownData.winners.join(' & ');
+    const winnerResult = showdownData.results.find(r => showdownData.winners.includes(r.playerId));
+    addWinnerMessage(`🏆 ${winnerNames} WON!`, `${winnerResult.handName} beats your ${myResult.handName}`, false);
+  }
+  
+  // Show detailed results
+  addGameMessage('📊 DETAILED SHOWDOWN RESULTS:');
+  showdownData.results.forEach((result, index) => {
+    const isWinner = showdownData.winners.includes(result.playerId);
+    const winnerIcon = isWinner ? '🏆 ' : `${index + 1}.`;
+    const holeCards = result.hand.map(card => `${card.r}${card.s}`).join(' ');
+    const isMe = result.playerId === playerName;
+    const playerIndicator = isMe ? ' (YOU)' : '';
+    
+    addGameMessage(`${winnerIcon} ${result.playerId}${playerIndicator}: ${result.handName} (${holeCards})`);
+  });
+  
+  if (showdownData.winners.length > 1) {
+    addGameMessage(`💰 Split pot: $${showdownData.potShare} each`);
+  } else {
+    addGameMessage(`💰 Winner takes: $${showdownData.potShare}`);
+  }
+  
+  // Show winner overlay on community cards area
+  showWinnerOverlay(showdownData.winners, didIWin);
+  
+  // Disable action buttons since hand is over
+  document.getElementById('foldBtn').disabled = true;
+  document.getElementById('callBtn').disabled = true;
+  document.getElementById('raiseBtn').disabled = true;
+  
+  // Update turn indicator
+  const turnEl = document.getElementById('turnIndicator');
+  turnEl.classList.remove('active');
+  turnEl.innerHTML = '<span>🏁 Hand Complete</span>';
+  
+  // Add visual celebration/mourning effects
+  const playerInfo = document.getElementById('playerInfo');
+  if (didIWin) {
+    playerInfo.classList.add('winner-celebration');
+    // Remove celebration after 10 seconds
+    setTimeout(() => {
+      playerInfo.classList.remove('winner-celebration');
+    }, 10000);
+  } else {
+    playerInfo.classList.add('loser-fade');
+    // Remove fade after 5 seconds
+    setTimeout(() => {
+      playerInfo.classList.remove('loser-fade');
+    }, 5000);
+  }
+}
+
+function addWinnerMessage(title, subtitle, isWinner) {
+  const messagesEl = document.getElementById('gameMessages');
+  const timestamp = new Date().toLocaleTimeString();
+  const bgColor = isWinner ? '#dcfce7' : '#fef3c7'; // Green for win, yellow for loss
+  const borderColor = isWinner ? '#16a34a' : '#d97706';
+  const textColor = isWinner ? '#15803d' : '#92400e';
+  
+  messagesEl.innerHTML += `
+    <div style="margin: 0.5rem 0; padding: 1rem; background: ${bgColor}; border-radius: 8px; border: 2px solid ${borderColor}; text-align: center;">
+      <div style="font-size: 1.2em; font-weight: bold; color: ${textColor}; margin-bottom: 0.5rem;">
+        ${title}
+      </div>
+      <div style="color: ${textColor}; font-size: 0.9em;">
+        ${subtitle}
+      </div>
+      <div style="color: #6b7280; font-size: 0.7em; margin-top: 0.5rem;">
+        [${timestamp}]
+      </div>
+    </div>
+  `;
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function showWinnerOverlay(winners, didIWin) {
+  const communitySection = document.querySelector('.community-cards');
+  
+  // Create winner overlay
+  const overlay = document.createElement('div');
+  const winnerText = didIWin ? 'YOU WON!' : `${winners.join(' & ')} WON!`;
+  const bgColor = didIWin ? 'rgba(34, 197, 94, 0.9)' : 'rgba(251, 191, 36, 0.9)';
+  const textColor = didIWin ? 'white' : '#92400e';
+  
+  overlay.innerHTML = `
+    <div style="
+      position: absolute; 
+      top: 0; 
+      left: 0; 
+      right: 0; 
+      bottom: 0; 
+      background: ${bgColor}; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      border-radius: 8px;
+      z-index: 10;
+      animation: fadeIn 0.5s ease-in;
+    ">
+      <div style="text-align: center; color: ${textColor};">
+        <div style="font-size: 1.5em; font-weight: bold; margin-bottom: 0.5rem;">
+          🏆 ${winnerText} 🏆
+        </div>
+        <div style="font-size: 0.9em; opacity: 0.9;">
+          Hand Complete
+        </div>
+      </div>
+    </div>
+  `;
+  
+  // Position relative for overlay
+  communitySection.style.position = 'relative';
+  communitySection.appendChild(overlay);
+  
+  // Remove overlay after 8 seconds
+  setTimeout(() => {
+    if (overlay.parentNode) {
+      overlay.parentNode.removeChild(overlay);
+    }
+  }, 8000);
+}
+
+function addGameMessage(message) {
+  const messagesEl = document.getElementById('gameMessages');
+  const timestamp = new Date().toLocaleTimeString();
+  messagesEl.innerHTML += `
+    <div style="margin: 0.25rem 0; padding: 0.5rem; background: white; border-radius: 4px; border-left: 3px solid #2563eb;">
+      <span style="color: #6b7280; font-size: 0.8em;">[${timestamp}]</span> ${message}
+    </div>
+  `;
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
 </script>
 </body>
 </html>

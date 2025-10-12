@@ -113,18 +113,52 @@ io.on('connection', (socket) => {
       console.warn(`⚠️  Client ${socket.id} tried to send message without being in a room`);
       return;
     }
-    
-    // Add sender info and broadcast to room
+
+    // Add sender info
     const messageWithSender = {
       from: socket.id,
       ...message
     };
-    
-    socket.to(socket.roomCode).emit('relay-message', messageWithSender);
-    console.log(`📨 Relayed message from ${socket.id} in room ${socket.roomCode}: ${message.type || 'unknown'}`);
+
+    // Check if this is a targeted message
+    if (message.targetPlayer) {
+      // Find the target player's socket
+      const room = rooms.get(socket.roomCode);
+      if (room && room.players.has(message.targetPlayer)) {
+        // Send to specific player only
+        const targetSocket = Array.from(io.sockets.sockets.values())
+          .find(s => s.roomCode === socket.roomCode && s.playerId === message.targetPlayer);
+        
+        if (targetSocket) {
+          targetSocket.emit('message', messageWithSender);
+          console.log(`📨 Sent targeted message to ${message.targetPlayer} in room ${socket.roomCode}: ${message.type || 'unknown'}`);
+        }
+      }
+    } else {
+      // Broadcast to all in room (including sender for confirmation)
+      io.to(socket.roomCode).emit('message', messageWithSender);
+      console.log(`📨 Relayed message from ${socket.id} in room ${socket.roomCode}: ${message.type || 'unknown'}`);
+    }
   });
-  
-  // Handle disconnection
+
+  // Handle messages from players (using send-message instead of relay-message)
+  socket.on('send-message', (message) => {
+    if (!socket.roomCode) {
+      console.warn(`⚠️  Client ${socket.id} tried to send message without being in a room`);
+      return;
+    }
+
+    // Add sender info and broadcast to room
+    const messageWithSender = {
+      from: socket.id,
+      fromPlayerId: socket.playerId,
+      ...message
+    };
+
+    // Send to everyone in the room (including back to sender as confirmation)
+    io.to(socket.roomCode).emit('message', messageWithSender);
+    console.log(`📨 Sent message from ${socket.playerId || socket.id} in room ${socket.roomCode}: ${message.type || 'unknown'}`);
+  });  // Handle disconnection
   socket.on('disconnect', () => {
     console.log(`🔌 Client disconnected: ${socket.id}`);
     
@@ -138,12 +172,12 @@ io.on('connection', (socket) => {
         console.log(`🏠 Room ${socket.roomCode} closed (host left)`);
       } else {
         // Player left, remove from room
-        room.players = room.players.filter(id => id !== socket.id);
+        room.players.delete(socket.playerId);
         socket.to(socket.roomCode).emit('relay-message', {
           from: socket.id,
           type: 'player-left'
         });
-        console.log(`👤 Player ${socket.id} left room ${socket.roomCode}`);
+        console.log(`👤 Player ${socket.playerId} left room ${socket.roomCode}`);
       }
     }
   });
