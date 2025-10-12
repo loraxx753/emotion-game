@@ -1,97 +1,269 @@
 <!doctype html>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Game Night Host</title>
-<style>
-  :root { 
-    font-family: system-ui, sans-serif; 
-    --primary: #2563eb;
-    --primary-light: #dbeafe;
-    --success: #059669;
-    --border: #e5e7eb;
-  }
-  body { 
-    margin: 1.5rem; 
-    display: grid; 
-    gap: 1rem; 
-    grid-template-columns: 1fr 1fr; 
-    background: #f8fafc;
-  }
-  section { 
-    border: 1px solid var(--border); 
-    border-radius: 12px; 
-    padding: 1rem; 
-    background: #fff;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  }
-  h2 { margin: 0 0 .5rem; color: #1f2937; }
-  h3 { margin: 1rem 0 .5rem; color: #374151; font-size: 1.1em; }
-  button { 
-    padding: .5rem 1rem; 
-    margin-right: .5rem; 
-    border: none;
-    border-radius: 6px;
-    background: var(--primary);
-    color: white;
-    cursor: pointer;
-    font-weight: 500;
-  }
-  button:hover { opacity: 0.9; }
-  button:disabled { opacity: 0.5; cursor: not-allowed; }
-  .row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
-  .game-selector { 
-    display: grid; 
-    gap: .5rem; 
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  }
-  .game-card {
-    border: 2px solid var(--border);
-    border-radius: 8px;
-    padding: 1rem;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-  .game-card:hover {
-    border-color: var(--primary);
-    background: var(--primary-light);
-  }
-  .game-card.selected {
-    border-color: var(--primary);
-    background: var(--primary-light);
-  }
-  .status-badge {
-    display: inline-block;
-    padding: .25rem .5rem;
-    border-radius: 4px;
-    font-size: .875rem;
-    font-weight: 500;
-  }
-  .status-waiting { background: #fef3c7; color: #92400e; }
-  .status-active { background: #d1fae5; color: #065f46; }
-  .players-list { 
-    list-style: none; 
-    padding: 0; 
-    margin: 0;
-  }
-  .players-list li {
-    padding: .5rem;
-    margin: .25rem 0;
-    background: #f9fafb;
-    border-radius: 4px;
-    border-left: 3px solid var(--success);
-  }
-  #gameArea {
-    grid-column: 1 / -1;
-    display: none;
-  }
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Host Game Night</title>
+  <style>
+    :root { 
+      font-family: system-ui, sans-serif; 
+      --primary: #2563eb;
+      --secondary: #10b981;
+      --accent: #7c3aed;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --border: #e5e7eb;
+      --text-light: #6b7280;
+      --text-dark: #374151;
+      --success: #059669;
+    }
+    
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #667eea 0%, #7c85f0 50%, #8b92f4 100%);
+      padding: 1rem;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(15px);
+      border-radius: 24px;
+      padding: 2rem;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.2);
+      border: 1px solid rgba(255,255,255,0.3);
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 2rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 2px solid var(--border);
+    }
+    
+    h1 {
+      margin: 0 0 0.5rem;
+      font-size: 2.5em;
+      background: linear-gradient(135deg, var(--primary), #3b71f3);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      font-weight: 800;
+    }
+    
+    .subtitle {
+      color: var(--text-light);
+      font-size: 1.1em;
+      margin: 0;
+    }
+    
+    .main-content {
+      display: grid;
+      gap: 2rem;
+      grid-template-columns: 1fr 1fr;
+    }
+    
+    .section {
+      background: white;
+      border-radius: 16px;
+      padding: 1.5rem;
+      border: 2px solid var(--border);
+      transition: all 0.3s ease;
+    }
+    
+    .section:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    }
+    
+    .section h2 {
+      margin: 0 0 1rem;
+      color: var(--text-dark);
+      font-size: 1.3em;
+      font-weight: 700;
+    }
+    
+    .section h3 {
+      margin: 1.5rem 0 0.5rem;
+      color: var(--text-dark);
+      font-size: 1.1em;
+      font-weight: 600;
+    }
+    
+    button {
+      padding: 0.75rem 1.25rem;
+      margin: 0.25rem 0.5rem 0.25rem 0;
+      border: none;
+      border-radius: 8px;
+      background: var(--primary);
+      color: white;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.9em;
+      transition: all 0.3s ease;
+    }
+    
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    }
+    
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    
+    button.secondary {
+      background: var(--warning);
+    }
+    
+    button.danger {
+      background: var(--danger);
+    }
+    
+    .row {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      flex-wrap: wrap;
+      margin: 0.75rem 0;
+    }
+    
+    .game-selector {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      margin-top: 1rem;
+    }
+    
+    .game-card {
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      background: white;
+    }
+    
+    .game-card:hover {
+      border-color: var(--primary);
+      background: #f0f7ff;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+    }
+    
+    .game-card.selected {
+      border-color: var(--primary);
+      background: #dbeafe;
+    }
+    
+    .status-badge {
+      display: inline-block;
+      padding: 0.4rem 0.8rem;
+      border-radius: 8px;
+      font-size: 0.8em;
+      font-weight: 600;
+    }
+    
+    .status-waiting {
+      background: #fef3c7;
+      color: #92400e;
+    }
+    
+    .status-active {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    
+    .players-list {
+      list-style: none;
+      padding: 0;
+      margin: 0.75rem 0;
+    }
+    
+    .players-list li {
+      padding: 0.75rem;
+      margin: 0.5rem 0;
+      background: #f9fafb;
+      border-radius: 8px;
+      border-left: 4px solid var(--success);
+      font-weight: 500;
+    }
+    
+    #gameArea {
+      grid-column: 1 / -1;
+      display: none;
+      margin-top: 1rem;
+    }
+    
+    .full-width {
+      grid-column: 1 / -1;
+    }
+    
+    /* Mobile Responsiveness */
+    @media (max-width: 768px) {
+      .container {
+        padding: 1rem;
+        margin: 0.5rem;
+        border-radius: 16px;
+      }
+      
+      .main-content {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+      }
+      
+      h1 {
+        font-size: 2em;
+      }
+      
+      .game-selector {
+        grid-template-columns: 1fr;
+      }
+      
+      .row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      
+      button {
+        width: 100%;
+        margin: 0.25rem 0;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      body {
+        padding: 0.5rem;
+      }
+      
+      .container {
+        padding: 1rem;
+        margin: 0;
+      }
+      
+      .section {
+        padding: 1rem;
+      }
+    }
 </style>
 
 <body>
+  <div class="container">
+    <div class="header">
+      <h1>🎯 Host Game Night</h1>
+      <p class="subtitle">Create and manage multiplayer games for friends</p>
+    </div>
 
-<!-- Game Selection -->
-<section id="gameSelection">
-  <h2>Choose Your Game</h2>
-  <div class="game-selector">
+    <div class="main-content">
+      <!-- Game Selection -->
+      <div class="section" id="gameSelection">
+        <h2>🎮 Choose Your Game</h2>
+        <div class="game-selector">
     <div class="game-card" data-game="poker">
       <h3>🃏 Poker</h3>
       <p>Texas Hold'em, chip management, betting rounds</p>
@@ -108,38 +280,40 @@
       <h3>⚙️ Custom</h3>
       <p>Build your own game with basic components</p>
     </div>
-  </div>
-</section>
+        </div>
+      </div>
 
-<!-- Room Management -->
-<section id="roomSection">
-  <h2>Game Room</h2>
-  <div id="preRoom">
-    <button id="btnCreateRoom" disabled>Create Room</button>
-    <p class="status-badge status-waiting">Select a game first</p>
-  </div>
-  
-  <div id="roomActive" style="display: none;">
-    <div class="row">
-      <span class="status-badge status-active">Room Active</span>
-      <strong>Code: <span id="roomCode"></span></strong>
+      <!-- Room Management -->
+      <div class="section" id="roomSection">
+        <h2>🏠 Game Room</h2>
+        <div id="preRoom">
+          <button id="btnCreateRoom" disabled>🚀 Create Room</button>
+          <p class="status-badge status-waiting">Select a game first</p>
+        </div>
+        
+        <div id="roomActive" style="display: none;">
+          <div class="row">
+            <span class="status-badge status-active">🟢 Room Active</span>
+            <strong>Code: <span id="roomCode"></span></strong>
+          </div>
+          <p>Share this code with players to join your <span id="selectedGameName">game</span>!</p>
+          
+          <h3>👥 Connected Players</h3>
+          <ul id="playersList" class="players-list">
+            <li><em>No players yet...</em></li>
+          </ul>
+        </div>
+      </div>
     </div>
-    <p>Share this code with players to join your <span id="selectedGameName">game</span>!</p>
-    
-    <h3>Connected Players</h3>
-    <ul id="playersList" class="players-list">
-      <li><em>No players yet...</em></li>
-    </ul>
-  </div>
-</section>
 
-<!-- Dynamic Game Area -->
-<section id="gameArea">
-  <h2>Game Controls</h2>
-  <div id="gameContent">
-    <!-- Game-specific UI will be loaded here -->
+    <!-- Dynamic Game Area -->
+    <div class="section full-width" id="gameArea">
+      <h2>🎮 Game Controls</h2>
+      <div id="gameContent">
+        <!-- Game-specific UI will be loaded here -->
+      </div>
+    </div>
   </div>
-</section>
 
 <script src="/socket.io/socket.io.js"></script>
 <script type="module">

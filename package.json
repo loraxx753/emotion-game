@@ -1,27 +1,39 @@
 {
   "name": "poker-party",
   "version": "2.0.0",
-  "description": "WebSocket-based multiplayer poker game",
+  "description": "Real-time multiplayer Texas Hold'em poker game with Socket.IO",
   "type": "module",
   "main": "server.mjs",
   "scripts": {
     "start": "node server.mjs",
-    "dev": "node server.mjs"
+    "dev": "node --watch server.mjs",
+    "lint": "echo 'No linting configured'",
+    "test": "echo 'No tests configured'"
   },
   "dependencies": {
     "socket.io": "^4.7.0"
   },
   "engines": {
-    "node": ">=16"
+    "node": ">=20.0.0"
   },
+  "keywords": [
+    "poker",
+    "multiplayer",
+    "websocket",
+    "socket.io",
+    "texas-holdem",
+    "card-game",
+    "real-time",
+    "node.js"
+  ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/loraxx753/emotion-game.git"
+    "url": "git+https://github.com/YOUR-USERNAME/poker-party.git"
   },
-  "license": "ISC",
-  "author": "",
-  "homepage": "https://github.com/loraxx753/emotion-game#readme",
+  "license": "MIT",
+  "author": "Your Name",
+  "homepage": "https://github.com/YOUR-USERNAME/poker-party#readme",
   "bugs": {
-    "url": "https://github.com/loraxx753/emotion-game/issues"
+    "url": "https://github.com/YOUR-USERNAME/poker-party/issues"
   }
 }

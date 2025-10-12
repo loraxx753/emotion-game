@@ -1,0 +1,55 @@
+name: 🃏 Poker Party CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [20.x, 22.x]
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 🔧 Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        
+    - name: 📦 Install dependencies
+      run: npm ci
+      
+    - name: 🚀 Test server startup
+      run: |
+        timeout 10s npm start &
+        sleep 5
+        curl -f http://localhost:3000 || exit 1
+        
+    - name: 🔍 Check file structure
+      run: |
+        test -f server.mjs || (echo "❌ server.mjs missing" && exit 1)
+        test -f index.html || (echo "❌ index.html missing" && exit 1)
+        test -f host.html || (echo "❌ host.html missing" && exit 1)
+        test -f player.html || (echo "❌ player.html missing" && exit 1)
+        test -f package.json || (echo "❌ package.json missing" && exit 1)
+        echo "✅ All required files present"
+        
+    - name: 🎯 Test WebSocket dependencies
+      run: |
+        node -e "
+          try { 
+            require('socket.io'); 
+            console.log('✅ Socket.IO available'); 
+          } catch(e) { 
+            console.log('❌ Socket.IO missing'); 
+            process.exit(1); 
+          }
+        "

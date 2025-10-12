@@ -1,53 +1,224 @@
 ﻿<!doctype html>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Game Player</title>
-<style>
-body { font-family: system-ui; margin: 1rem; background: #f8fafc; }
-section { background: white; padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-input, button { padding: 0.5rem; margin: 0.25rem; border: 1px solid #ccc; border-radius: 4px; }
-button { background: #2563eb; color: white; border: none; cursor: pointer; font-weight: 500; }
-button:hover { opacity: 0.9; }
-button:disabled { opacity: 0.5; cursor: not-allowed; }
-.status { padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.875rem; }
-.status-waiting { background: #fef3c7; color: #92400e; }
-.status-connected { background: #d1fae5; color: #065f46; }
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Join Game Night</title>
+  <style>
+    :root { 
+      font-family: system-ui, sans-serif; 
+      --primary: #2563eb;
+      --secondary: #10b981;
+      --accent: #7c3aed;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --border: #e5e7eb;
+      --text-light: #6b7280;
+      --text-dark: #374151;
+      --success: #059669;
+    }
+    
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #667eea 0%, #7c85f0 50%, #8b92f4 100%);
+      padding: 1rem;
+    }
+    
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(15px);
+      border-radius: 20px;
+      padding: 2rem;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.2);
+      border: 1px solid rgba(255,255,255,0.3);
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    
+    h1 {
+      margin: 0 0 0.5rem;
+      font-size: 2.5em;
+      background: linear-gradient(135deg, var(--primary), #3b71f3);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      font-weight: 800;
+    }
+    
+    .subtitle {
+      color: var(--text-light);
+      font-size: 1.1em;
+      margin: 0;
+    }
+    
+    .section {
+      background: white;
+      border-radius: 16px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      border: 2px solid var(--border);
+      transition: all 0.3s ease;
+    }
+    
+    .section:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    }
+    
+    .section h2 {
+      margin: 0 0 1rem;
+      color: var(--text-dark);
+      font-size: 1.4em;
+      font-weight: 700;
+    }
+    
+    input {
+      width: 100%;
+      padding: 0.75rem;
+      margin: 0.5rem 0;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      font-size: 1em;
+      transition: border-color 0.3s ease;
+      box-sizing: border-box;
+    }
+    
+    input:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+    
+    button {
+      padding: 0.75rem 1.5rem;
+      margin: 0.5rem 0;
+      border: none;
+      border-radius: 8px;
+      background: var(--primary);
+      color: white;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 1em;
+      transition: all 0.3s ease;
+      width: 100%;
+    }
+    
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    }
+    
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    
+    .status {
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-size: 0.9em;
+      font-weight: 600;
+      text-align: center;
+      margin: 1rem 0;
+    }
+    
+    .status-waiting {
+      background: #fef3c7;
+      color: #92400e;
+    }
+    
+    .status-connected {
+      background: #d1fae5;
+      color: #065f46;
+    }
 
-/* Poker-specific styles */
-.player-info { 
-  background: #1e293b; 
-  color: white; 
-  padding: 1rem; 
-  border-radius: 8px; 
-  margin-bottom: 1rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.player-name { font-size: 1.2rem; font-weight: bold; }
-.player-stats { display: flex; gap: 1rem; }
-.stat { text-align: center; }
-.stat-value { font-size: 1.1rem; font-weight: bold; color: #22d3ee; }
-.stat-label { font-size: 0.8rem; opacity: 0.8; }
+    /* Poker-specific styles */
+    .player-info { 
+      background: linear-gradient(135deg, #1e293b, #334155); 
+      color: white; 
+      padding: 1.5rem; 
+      border-radius: 16px; 
+      margin-bottom: 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 8px 25px rgba(30, 41, 59, 0.3);
+    }
+    
+    .player-name { 
+      font-size: 1.3rem; 
+      font-weight: 700; 
+    }
+    
+    .player-stats { 
+      display: flex; 
+      gap: 1.5rem; 
+    }
+    
+    .stat { 
+      text-align: center; 
+    }
+    
+    .stat-value { 
+      font-size: 1.2rem; 
+      font-weight: bold; 
+      color: #22d3ee; 
+    }
+    
+    .stat-label { 
+      font-size: 0.9em; 
+      opacity: 0.8; 
+      margin-top: 0.25rem;
+    }
 
-.hand-area { margin: 1rem 0; }
-.cards { display: flex; gap: 0.5rem; justify-content: center; margin: 1rem 0; }
-.card { 
-  background: white; 
-  border: 2px solid #374151; 
-  border-radius: 8px; 
-  padding: 0.5rem 1rem; 
-  font-weight: bold; 
-  font-size: 1.1rem;
-  min-width: 60px;
-  text-align: center;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-.card.red { color: #dc2626; }
-.card.black { color: #1f2937; }
+    .hand-area, .community-cards { 
+      margin: 1.5rem 0; 
+    }
+    
+    .cards { 
+      display: flex; 
+      gap: 0.75rem; 
+      justify-content: center; 
+      margin: 1rem 0; 
+      flex-wrap: wrap;
+    }
+    
+    .card { 
+      background: white; 
+      border: 2px solid #e5e7eb; 
+      border-radius: 12px; 
+      padding: 0.75rem 1rem; 
+      font-weight: bold; 
+      font-size: 1.1rem;
+      min-width: 65px;
+      text-align: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      transition: transform 0.3s ease;
+    }
+    
+    .card:hover {
+      transform: translateY(-2px);
+    }
+    
+    .card.red { 
+      color: #dc2626; 
+      border-color: #fca5a5;
+    }
+    
+    .card.black { 
+      color: #1f2937; 
+      border-color: #d1d5db;
+    }
 
-.actions { 
-  display: flex; 
+    .actions { 
+      display: flex; 
   gap: 0.5rem; 
   justify-content: center; 
   flex-wrap: wrap;
@@ -122,22 +293,93 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   opacity: 0.6;
   border-color: #d1d5db !important;
 }
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .container {
+    padding: 1rem;
+    margin: 0.5rem;
+    border-radius: 16px;
+  }
+  
+  h1 {
+    font-size: 2em;
+  }
+  
+  .section {
+    padding: 1.5rem;
+  }
+  
+  .player-info {
+    flex-direction: column;
+    text-align: center;
+    gap: 1rem;
+  }
+  
+  .player-stats {
+    justify-content: center;
+  }
+  
+  .cards {
+    gap: 0.5rem;
+  }
+  
+  .card {
+    min-width: 50px;
+    padding: 0.5rem 0.75rem;
+    font-size: 1rem;
+  }
+  
+  .actions {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  
+  .action-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  body {
+    padding: 0.5rem;
+  }
+  
+  .container {
+    padding: 1rem;
+    margin: 0;
+  }
+  
+  .section {
+    padding: 1rem;
+  }
+  
+  .card {
+    min-width: 45px;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.9rem;
+  }
+}
 </style>
 
 <body>
-<section>
-  <h2>Join Game</h2>
-  <div>
-    <input id="playerName" placeholder="Your name" value="Player-1">
-    <input id="roomCode" placeholder="Room code">
-    <button onclick="joinRoom()">Join</button>
-    <span id="status" class="status status-waiting">Enter room code</span>
-  </div>
-</section>
+  <div class="container">
+    <div class="header">
+      <h1>🎮 Join Game Night</h1>
+      <p class="subtitle">Enter room code to play with friends</p>
+    </div>
 
-<section id="gameArea" style="display:none">
-  <!-- Player Info -->
-  <div class="player-info">
+    <div class="section">
+      <h2>🚪 Join Game</h2>
+      <input id="playerName" placeholder="Your name" value="Player-1">
+      <input id="roomCode" placeholder="Room code (e.g. ABC123)">
+      <button onclick="joinRoom()">🎯 Join Game</button>
+      <div class="status" id="status">Enter name and room code</div>
+    </div>
+
+    <div class="section" id="gameArea" style="display:none">
+      <!-- Player Info -->
+      <div class="player-info">
     <div class="player-name" id="playerDisplayName">Player-1</div>
     <div class="player-stats">
       <div class="stat">
@@ -201,11 +443,12 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
     </div>
   </div>
 
-  <!-- Game Messages -->
-  <div id="gameMessages" style="max-height: 200px; overflow-y: auto; background: #f9fafb; padding: 1rem; border-radius: 8px; margin-top: 1rem;">
-    <div style="color: #6b7280; font-style: italic;">Game messages will appear here...</div>
+      <!-- Game Messages -->
+      <div id="gameMessages" style="max-height: 200px; overflow-y: auto; background: #f9fafb; padding: 1rem; border-radius: 8px; margin-top: 1rem;">
+        <div style="color: #6b7280; font-style: italic;">Game messages will appear here...</div>
+      </div>
+    </div>
   </div>
-</section>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
