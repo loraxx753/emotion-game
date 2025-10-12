@@ -461,6 +461,10 @@ let isMyTurn = false;
 let isFolded = false;
 let hand = [];
 
+// Check if debug mode is enabled via URL parameter
+const urlParams = new URLSearchParams(window.location.search);
+const debugMode = urlParams.has('debug');
+
 function joinRoom() {
   const name = document.getElementById('playerName').value.trim();
   const code = document.getElementById('roomCode').value.trim();
@@ -497,7 +501,9 @@ function joinRoom() {
 
 // Socket message handlers
 socket.on('message', (msg) => {
-  console.log('Received:', msg);
+  if (debugMode) {
+    console.log('Received:', msg);
+  }
   
   switch (msg.type) {
     case 'ACCEPT':
@@ -521,7 +527,10 @@ socket.on('message', (msg) => {
       break;
       
     default:
-      addGameMessage('📨 ' + JSON.stringify(msg));
+      // Only show raw messages in debug mode
+      if (debugMode) {
+        addGameMessage('📨 ' + JSON.stringify(msg));
+      }
   }
 });
 

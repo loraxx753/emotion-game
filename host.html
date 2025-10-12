@@ -328,6 +328,10 @@ class GameHost {
     this.players = new Set();
     this.isHost = false;
     
+    // Check if debug mode is enabled via URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    this.debugMode = urlParams.has('debug');
+    
     this.setupEventListeners();
     this.setupSocketHandlers();
   }
@@ -346,7 +350,9 @@ class GameHost {
   
   setupSocketHandlers() {
     this.socket.on('player-joined', (data) => {
-      console.log('Player joined:', data.playerId);
+      if (this.debugMode) {
+        console.log('Player joined:', data.playerId);
+      }
       this.players.add(data.playerId);
       this.updatePlayersList();
       
@@ -357,7 +363,9 @@ class GameHost {
     });
     
     this.socket.on('player-left', (data) => {
-      console.log('Player left:', data.playerId);
+      if (this.debugMode) {
+        console.log('Player left:', data.playerId);
+      }
       this.players.delete(data.playerId);
       this.updatePlayersList();
       
@@ -406,7 +414,9 @@ class GameHost {
     // Use our built-in poker module for now
     if (gameType === 'poker') {
       this.gameModule = new PokerGameModule(this);
-      console.log('Loaded poker game module');
+      if (this.debugMode) {
+        console.log('Loaded poker game module');
+      }
     } else {
       console.warn(`Game module ${gameType} not found, using poker module as fallback`);
       // Fallback to poker module
@@ -436,7 +446,9 @@ class GameHost {
           this.gameModule.onRoomCreated(this.roomCode);
         }
         
-        console.log('Room created:', this.roomCode);
+        if (this.debugMode) {
+          console.log('Room created:', this.roomCode);
+        }
       } else {
         console.error('Failed to create room:', response.error);
         alert('Failed to create room: ' + response.error);
@@ -483,6 +495,7 @@ class GameHost {
 class PokerGameModule {
   constructor(host) {
     this.host = host;
+    this.debugMode = host.debugMode; // Inherit debug mode from host
     this.deck = [];
     this.communityCards = [];
     this.players = new Map(); // playerId -> {chips, cards, bet, folded, active}
@@ -536,7 +549,9 @@ class PokerGameModule {
   }
   
   onPlayerJoined(data) {
-    console.log('Poker: player joined', data.playerId);
+    if (this.debugMode) {
+      console.log('Poker: player joined', data.playerId);
+    }
     
     // Initialize player data
     this.players.set(data.playerId, {
@@ -557,13 +572,17 @@ class PokerGameModule {
   }
   
   onPlayerLeft(data) {
-    console.log('Poker: player left', data.playerId);
+    if (this.debugMode) {
+      console.log('Poker: player left', data.playerId);
+    }
     this.players.delete(data.playerId);
     this.updateGameStatus();
   }
   
   onMessage(msg) {
-    console.log('Poker: received message', msg);
+    if (this.debugMode) {
+      console.log('Poker: received message', msg);
+    }
     
     if (msg.type === 'HELLO') {
       // Player joined and saying hello
